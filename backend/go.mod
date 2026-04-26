@@ -4,11 +4,11 @@ go 1.26.2
 
 require (
 	github.com/MicahParks/keyfunc/v2 v2.1.0
+	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/generative-ai-go v0.20.1
 	github.com/joho/godotenv v1.5.1
-	github.com/rs/cors v1.11.1
 	github.com/supabase-community/supabase-go v0.0.4
 	google.golang.org/api v0.276.0
 )
@@ -27,7 +27,6 @@ require (
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
-	github.com/gin-contrib/cors v1.7.7 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
