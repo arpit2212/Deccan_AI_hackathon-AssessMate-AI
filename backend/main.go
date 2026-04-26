@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"assessmate-backend/config"
+	"assessmate-backend/db"
 	"assessmate-backend/routes"
 
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,11 @@ import (
 func main() {
 	// Load configuration
 	config.LoadConfig()
+
+	// Initialize Supabase
+	if err := db.InitDB(); err != nil {
+		log.Fatal("Failed to initialize Supabase client:", err)
+	}
 
 	// Initialize Gin
 	r := gin.Default()

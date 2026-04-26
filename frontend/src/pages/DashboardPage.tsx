@@ -4,9 +4,11 @@ import { useAuth } from '../hooks/useAuth'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Compass, Dna, Rocket, Plus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   const container = {
     hidden: { opacity: 0 },
@@ -44,7 +46,7 @@ export const DashboardPage: React.FC = () => {
             </div>
             <h3 className="text-lg font-bold mb-2 text-text-primary">Your Journeys</h3>
             <p className="text-sm text-text-secondary mb-6">You haven't started any preparation journeys yet.</p>
-            <Button size="sm" className="gap-2">
+            <Button size="sm" className="gap-2" onClick={() => navigate('/journeys/new')}>
               <Plus className="h-4 w-4" />
               New Journey
             </Button>

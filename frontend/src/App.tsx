@@ -7,6 +7,9 @@ import { LoginPage } from './pages/LoginPage'
 import { AuthCallbackPage } from './pages/AuthCallbackPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { JourneysPage } from './pages/JourneysPage'
+import { NewJourneyPage } from './pages/NewJourneyPage'
+import { AssignmentPage } from './pages/AssignmentPage'
+import { LearningPlanPage } from './pages/LearningPlanPage'
 
 function App() {
   return (
@@ -23,6 +26,9 @@ function App() {
           <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/journeys" element={<JourneysPage />} />
+            <Route path="/journeys/new" element={<NewJourneyPage />} />
+            <Route path="/assignment/:journeyId" element={<AssignmentPage />} />
+            <Route path="/learning-plan/:journeyId" element={<LearningPlanPage />} />
             {/* Redirect /app or other unknown routes to dashboard */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
