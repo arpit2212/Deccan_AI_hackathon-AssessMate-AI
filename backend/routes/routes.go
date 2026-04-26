@@ -27,6 +27,7 @@ func SetupRoutes(r *gin.Engine) {
 			protected.PATCH("/learning-plan/:journeyId/progress", handlers.UpdateLearningProgress)
 			protected.POST("/learning-plan/:journeyId/progress", handlers.UpdateLearningProgress)
 			protected.POST("/learning-plan/:journeyId/chat", handlers.LearningPlanChat)
+			protected.GET("/learning-plan/:journeyId/youtube-suggestions", handlers.GetLearningYouTubeSuggestions)
 		}
 	}
 }

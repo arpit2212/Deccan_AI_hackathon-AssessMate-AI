@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -151,4 +152,100 @@ RETURN STRICT JSON ONLY:
 		return "", fmt.Errorf("empty mentor reply")
 	}
 	return out.Reply, nil
+}
+
+func extractFirstJSONObjectLP(raw string) (string, error) {
+	for i := strings.Index(raw, "{"); i >= 0; {
+		sub := strings.TrimSpace(raw[i:])
+		var v any
+		dec := json.NewDecoder(strings.NewReader(sub))
+		dec.UseNumber()
+		if err := dec.Decode(&v); err == nil {
+			b, marshalErr := json.Marshal(v)
+			if marshalErr != nil {
+				return "", fmt.Errorf("failed to re-marshal json: %w", marshalErr)
+			}
+			return string(b), nil
+		}
+		next := strings.Index(raw[i+1:], "{")
+		if next < 0 {
+			break
+		}
+		i = i + 1 + next
+	}
+	return "", fmt.Errorf("no JSON object found in model output")
+}
+
+func RecommendYouTubeCourses(ctx context.Context, skills []string, planData interface{}, maxItems int) ([]models.LearningResource, error) {
+	model, client, err := services.GetGeminiModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer client.Close()
+
+	if maxItems <= 0 {
+		maxItems = 8
+	}
+
+	prompt := fmt.Sprintf(`
+You are a technical learning curator for interview preparation.
+
+INPUT:
+1) Skills needed: %v
+2) Learning plan data: %v
+3) Maximum items: %d
+
+GOAL:
+- Suggest high-quality YouTube learning resources that directly help close the listed skill gaps.
+- Prefer practical courses/playlists and strong tutorial videos over generic motivation content.
+
+RULES:
+- Return between 4 and %d items.
+- Each item must map to a specific skill.
+- URL must be a full YouTube URL.
+- Include title, skill, and rough duration.
+- Avoid duplicates.
+- Output JSON only (no markdown, no explanation).
+
+RETURN STRICT JSON:
+{
+  "youtube_resources": [
+    {
+      "title": "System Design Interview Course",
+      "url": "https://www.youtube.com/watch?v=XXXXXXXXXXX",
+      "skill": "System Design",
+      "duration": "2h 10m"
+    }
+  ]
+}
+`, skills, planData, maxItems, maxItems)
+
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("no response from Gemini")
+	}
+
+	raw := fmt.Sprint(resp.Candidates[0].Content.Parts[0])
+	jsonOnly, err := extractFirstJSONObjectLP(raw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract JSON from model output: %w", err)
+	}
+
+	var out struct {
+		YouTubeResources []models.LearningResource `json:"youtube_resources"`
+	}
+	if err := json.Unmarshal([]byte(jsonOnly), &out); err != nil {
+		return nil, fmt.Errorf("failed to parse Gemini JSON: %w", err)
+	}
+	if len(out.YouTubeResources) == 0 {
+		return nil, fmt.Errorf("empty youtube resource recommendations")
+	}
+	if len(out.YouTubeResources) > maxItems {
+		out.YouTubeResources = out.YouTubeResources[:maxItems]
+	}
+
+	return out.YouTubeResources, nil
 }

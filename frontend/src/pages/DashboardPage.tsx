@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -15,7 +15,29 @@ interface Journey {
   analysis_result: any
 }
 
+const CountUp: React.FC<{ value: number; delay?: number }> = ({ value, delay = 0 }) => {
+  const [display, setDisplay] = useState(0)
+
+  useEffect(() => {
+    const start = window.setTimeout(() => {
+      const duration = 550
+      const startTime = performance.now()
+      const tick = (now: number) => {
+        const p = Math.min(1, (now - startTime) / duration)
+        setDisplay(Math.round(value * p))
+        if (p < 1) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    }, delay)
+    return () => window.clearTimeout(start)
+  }, [value, delay])
+
+  return <>{display}</>
+}
+
 export const DashboardPage: React.FC = () => {
+  const prefersReducedMotion = useReducedMotion()
+  const easeOutCurve = [0, 0, 0.2, 1] as const
   const { user, session } = useAuth()
   const navigate = useNavigate()
   const [journeys, setJourneys] = useState<Journey[]>([])
@@ -46,20 +68,22 @@ export const DashboardPage: React.FC = () => {
   }, [session])
 
   const latestJourney = journeys[0]
+  const totalJourneys = journeys.length
+  const highFitRoles = journeys.filter(j => j.analysis_result?.fit_score > 70).length
 
   const container = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1
+        staggerChildren: 0.08
       }
     }
   }
 
   const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 }
+    hidden: { opacity: 0, y: prefersReducedMotion ? 0 : 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: easeOutCurve } }
   }
 
   if (loading) {
@@ -71,29 +95,26 @@ export const DashboardPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto pb-12">
-      <header className="mb-10 flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.full_name?.split(' ')[0] || 'User'}!</h1>
-          <p className="text-text-secondary">Here's what's happening with your skill evolution today.</p>
+    <motion.div variants={container} initial="hidden" animate="show" className="max-w-6xl mx-auto pb-12">
+      <header className="mb-10 flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-end">
+        <div className="space-y-1">
+          <motion.h1 variants={item} className="text-3xl font-bold mb-2">Welcome back, {user?.full_name?.split(' ')[0] || 'User'}!</motion.h1>
+          <motion.p variants={item} className="text-text-secondary">Here's what's happening with your skill evolution today.</motion.p>
         </div>
-        <Button onClick={() => navigate('/journeys/new')} className="gap-2">
+        <motion.div variants={item}>
+        <Button onClick={() => navigate('/journeys/new')} className="gap-2 w-full sm:w-auto hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97] transition-all duration-200">
           <Plus className="h-4 w-4" />
           New Journey
         </Button>
+        </motion.div>
       </header>
 
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12"
-      >
+      <motion.div variants={container} className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
         {/* Latest Journey Card */}
         <motion.div variants={item} className="lg:col-span-2">
-          <Card className="p-6 h-full relative overflow-hidden group">
+          <Card className="p-6 h-full relative overflow-hidden group rounded-2xl border-l-2 border-l-primary/30 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-300">
             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Compass className="w-32 h-32" />
+              <Compass className="w-32 h-32 animate-[spin_20s_linear_infinite] group-hover:[animation-play-state:paused]" />
             </div>
             
             {latestJourney ? (
@@ -109,11 +130,11 @@ export const DashboardPage: React.FC = () => {
                   at {latestJourney.company_name}
                 </p>
                 
-                <div className="mt-auto flex gap-4">
-                  <Button size="sm" onClick={() => navigate(`/assignment/${latestJourney.id}`)}>
+                <div className="mt-auto flex flex-col sm:flex-row gap-3 sm:gap-4">
+                  <Button size="sm" className="hover:-translate-y-px transition-all duration-200" onClick={() => navigate(`/assignment/${latestJourney.id}`)}>
                     Continue Assessment
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => navigate(`/learning-plan/${latestJourney.id}`)}>
+                  <Button variant="outline" size="sm" className="hover:border-primary hover:text-primary transition-colors duration-200" onClick={() => navigate(`/learning-plan/${latestJourney.id}`)}>
                     View Roadmap
                   </Button>
                 </div>
@@ -148,19 +169,28 @@ export const DashboardPage: React.FC = () => {
                   <span>{journeys.length}</span>
                 </div>
                 <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                  <div className="h-full bg-white rounded-full" style={{ width: `${Math.min(journeys.length * 20, 100)}%` }} />
+                  <motion.div
+                    className="h-full bg-white rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(totalJourneys * 20, 100)}%` }}
+                    transition={{ duration: 0.6, ease: easeOutCurve, delay: 0.6 }}
+                  />
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4 pt-4">
-                <div className="bg-white/10 p-3 rounded-xl">
-                  <p className="text-2xl font-bold">{journeys.length}</p>
+                <motion.div className="bg-white/10 p-3 rounded-xl hover:scale-[1.03] transition-transform duration-200">
+                  <motion.p className="text-2xl font-bold" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+                    <CountUp value={totalJourneys} />
+                  </motion.p>
                   <p className="text-xs opacity-70">Roles Analyzed</p>
-                </div>
-                <div className="bg-white/10 p-3 rounded-xl">
-                  <p className="text-2xl font-bold">{journeys.filter(j => j.analysis_result?.fit_score > 70).length}</p>
+                </motion.div>
+                <motion.div className="bg-white/10 p-3 rounded-xl hover:scale-[1.03] transition-transform duration-200">
+                  <motion.p className="text-2xl font-bold" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.1 }}>
+                    <CountUp value={highFitRoles} delay={80} />
+                  </motion.p>
                   <p className="text-xs opacity-70">High Fit Roles</p>
-                </div>
+                </motion.div>
               </div>
             </div>
           </Card>
@@ -170,24 +200,25 @@ export const DashboardPage: React.FC = () => {
       {/* Recent Journeys Table */}
       <motion.div variants={item}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-text-primary">Recent Activity</h2>
-          <Button variant="ghost" size="sm" onClick={() => navigate('/journeys')} className="text-primary hover:text-primary-hover">
+          <motion.h2 variants={item} className="text-xl font-bold text-text-primary">Recent Activity</motion.h2>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/journeys')} className="text-primary hover:text-primary underline-offset-2 transition-all duration-150">
             View All Journeys
           </Button>
         </div>
         
         <Card className="overflow-hidden">
           {journeys.length > 0 ? (
-            <div className="divide-y divide-gray-100">
+            <motion.div variants={container} initial="hidden" animate="show" className="divide-y divide-gray-100/80">
               {journeys.slice(0, 5).map((journey) => (
-                <div 
+                <motion.div
+                  variants={{ hidden: { opacity: 0, y: prefersReducedMotion ? 0 : 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: easeOutCurve } } }}
                   key={journey.id}
-                  className="p-4 hover:bg-gray-50 transition-colors cursor-pointer flex items-center justify-between group"
+                  className="p-3 sm:p-4 hover:bg-primary/5 hover:translate-x-[2px] rounded-lg transition-all duration-200 cursor-pointer flex items-center justify-between group"
                   onClick={() => navigate(`/assignment/${journey.id}`)}
                 >
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-primary/5 rounded-lg flex items-center justify-center text-primary">
-                      <Clock className="h-5 w-5" />
+                      <Clock className="h-5 w-5 animate-[pulse_3s_ease-in-out_infinite]" />
                     </div>
                     <div>
                       <h4 className="font-bold text-text-primary group-hover:text-primary transition-colors">
@@ -204,11 +235,11 @@ export const DashboardPage: React.FC = () => {
                       </p>
                       <p className="text-xs text-text-secondary">Analyzed</p>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-primary transition-colors" />
+                    <ChevronRight className="h-5 w-5 text-gray-300/40 group-hover:text-primary group-hover:translate-x-[3px] transition-all duration-200" />
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           ) : (
             <div className="p-12 text-center">
               <p className="text-text-secondary mb-4">No recent activity to show.</p>
@@ -219,6 +250,6 @@ export const DashboardPage: React.FC = () => {
           )}
         </Card>
       </motion.div>
-    </div>
+    </motion.div>
   )
 }

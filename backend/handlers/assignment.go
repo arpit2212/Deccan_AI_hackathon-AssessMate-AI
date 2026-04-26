@@ -15,13 +15,13 @@ import (
 )
 
 type Assignment struct {
-	ID        string      `json:"id,omitempty"`
-	JourneyID string      `json:"journey_id"`
-	Questions interface{} `json:"questions"`
+	ID        string              `json:"id,omitempty"`
+	JourneyID string              `json:"journey_id"`
+	Questions interface{}         `json:"questions"`
 	Attempts  []AssignmentAttempt `json:"attempts,omitempty"`
-	Score     int         `json:"score"`
-	Status    string      `json:"status"`
-	CreatedAt time.Time   `json:"created_at"`
+	Score     int                 `json:"score"`
+	Status    string              `json:"status"`
+	CreatedAt time.Time           `json:"created_at"`
 }
 
 type AssignmentAttempt struct {
@@ -52,12 +52,12 @@ type SubmitAssignmentRequest struct {
 }
 
 type AssignmentListItem struct {
-	JourneyID   string `json:"journey_id"`
-	RoleName    string `json:"role_name"`
-	CompanyName string `json:"company_name"`
-	Status      string `json:"status"`
-	Attempts    int    `json:"attempts"`
-	Score       int    `json:"score"`
+	JourneyID   string    `json:"journey_id"`
+	RoleName    string    `json:"role_name"`
+	CompanyName string    `json:"company_name"`
+	Status      string    `json:"status"`
+	Attempts    int       `json:"attempts"`
+	Score       int       `json:"score"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -103,6 +103,140 @@ func parseFinalAnalysis(v interface{}) (*models.FinalAnalysis, error) {
 		return nil, err
 	}
 	return &out, nil
+}
+
+func asInt(v interface{}) int {
+	switch t := v.(type) {
+	case int:
+		return t
+	case int32:
+		return int(t)
+	case int64:
+		return int(t)
+	case float32:
+		return int(t)
+	case float64:
+		return int(t)
+	case json.Number:
+		i, _ := t.Int64()
+		return int(i)
+	default:
+		return 0
+	}
+}
+
+func normalizeAnalysisMap(v interface{}) map[string]interface{} {
+	if v == nil {
+		return map[string]interface{}{}
+	}
+	if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+		var out map[string]interface{}
+		if err := json.Unmarshal([]byte(s), &out); err == nil {
+			return out
+		}
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return map[string]interface{}{}
+	}
+	out := map[string]interface{}{}
+	_ = json.Unmarshal(b, &out)
+	return out
+}
+
+func extractSkillGapsFlexible(raw interface{}, focusSkill string) []models.SkillMatch {
+	out := []models.SkillMatch{}
+	analysisMap := normalizeAnalysisMap(raw)
+	seen := map[string]bool{}
+
+	if sa, ok := analysisMap["skill_analysis"].([]interface{}); ok {
+		for _, item := range sa {
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			name, _ := m["name"].(string)
+			if strings.TrimSpace(name) == "" {
+				name, _ = m["skill"].(string)
+			}
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			if focusSkill != "" && !strings.EqualFold(name, strings.TrimSpace(focusSkill)) {
+				continue
+			}
+
+			required := asInt(m["required_level"])
+			if required == 0 {
+				required = asInt(m["requiredLevel"])
+			}
+			estimated := asInt(m["estimated_level"])
+			if estimated == 0 {
+				estimated = asInt(m["estimatedLevel"])
+			}
+			if estimated == 0 {
+				estimated = asInt(m["current_level"])
+			}
+			if estimated == 0 {
+				estimated = asInt(m["currentLevel"])
+			}
+			gap := asInt(m["gap"])
+			if gap <= 0 {
+				gap = required - estimated
+			}
+			if gap <= 0 && focusSkill == "" {
+				continue
+			}
+			if gap <= 0 {
+				gap = 1
+			}
+
+			key := strings.ToLower(name)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, models.SkillMatch{
+				Name:           name,
+				RequiredLevel:  maxInt(required, 1),
+				EstimatedLevel: estimated,
+				Gap:            gap,
+				Importance:     "critical",
+			})
+		}
+	}
+
+	// Fallback from critical_gaps when skill_analysis is incomplete
+	if len(out) == 0 {
+		if cg, ok := analysisMap["critical_gaps"].([]interface{}); ok {
+			for _, c := range cg {
+				name, _ := c.(string)
+				name = strings.TrimSpace(name)
+				if name == "" {
+					continue
+				}
+				if focusSkill != "" && !strings.EqualFold(name, strings.TrimSpace(focusSkill)) {
+					continue
+				}
+				key := strings.ToLower(name)
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				out = append(out, models.SkillMatch{
+					Name:           name,
+					RequiredLevel:  7,
+					EstimatedLevel: 3,
+					Gap:            4,
+					Importance:     "critical",
+					Evidence:       "Derived from critical_gaps",
+				})
+			}
+		}
+	}
+
+	return out
 }
 
 func computeGapAndCritical(a *models.FinalAnalysis) {
@@ -171,16 +305,10 @@ func GetOrCreateAssignment(c *gin.Context) {
 	}
 
 	// 3. Extract skill gaps from analysis result (robustly)
-	finalAnalysis, err := parseFinalAnalysis(journey.AnalysisResult)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid analysis_result format"})
+	skillGaps := extractSkillGapsFlexible(journey.AnalysisResult, "")
+	if len(skillGaps) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No skill gaps found in analysis_result"})
 		return
-	}
-	var skillGaps []models.SkillMatch
-	for _, s := range finalAnalysis.SkillAnalysis {
-		if s.Gap > 0 {
-			skillGaps = append(skillGaps, s)
-		}
 	}
 
 	companyCtx := ""
@@ -299,21 +427,7 @@ func ReattemptAssignment(c *gin.Context) {
 	}
 
 	// Use skill gaps from current analysis_result
-	finalAnalysis, err := parseFinalAnalysis(journey.AnalysisResult)
-	var skillGaps []models.SkillMatch
-	if err == nil && finalAnalysis != nil {
-		for _, s := range finalAnalysis.SkillAnalysis {
-			if focusSkill != "" {
-				if strings.EqualFold(strings.TrimSpace(s.Name), focusSkill) {
-					skillGaps = append(skillGaps, s)
-				}
-				continue
-			}
-			if s.Gap > 0 {
-				skillGaps = append(skillGaps, s)
-			}
-		}
-	}
+	skillGaps := extractSkillGapsFlexible(journey.AnalysisResult, focusSkill)
 	// Fallback: if analysis_result is malformed or doesn't have gaps, still allow selected-skill upskill.
 	if len(skillGaps) == 0 && focusSkill != "" {
 		skillGaps = append(skillGaps, models.SkillMatch{
@@ -440,8 +554,8 @@ func SubmitAssignment(c *gin.Context) {
 	payload.Attempts = append(payload.Attempts, attempt)
 
 	_, _, err := db.Client.From("assignments").Update(map[string]interface{}{
-		"score":  req.Score,
-		"status": "completed",
+		"score":     req.Score,
+		"status":    "completed",
 		"questions": payload,
 	}, "", "").Eq("journey_id", req.JourneyID).Execute()
 	if err != nil {

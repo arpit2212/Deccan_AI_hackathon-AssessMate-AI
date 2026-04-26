@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,10 @@ type UpdateLearningProgressRequest struct {
 
 type LearningChatRequest struct {
 	Message string `json:"message"`
+}
+
+type YouTubeSuggestionResponse struct {
+	YouTubeResources []models.LearningResource `json:"youtube_resources"`
 }
 
 func toMap(v interface{}) map[string]interface{} {
@@ -244,4 +249,242 @@ func LearningPlanChat(c *gin.Context) {
 		"reply":        reply,
 		"chat_history": history,
 	})
+}
+
+func extractSkillNamesFromAnalysis(raw interface{}) []string {
+	names := []string{}
+	seen := map[string]bool{}
+
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		return names
+	}
+	items, ok := m["skill_analysis"].([]interface{})
+	if !ok {
+		return names
+	}
+	for _, item := range items {
+		skillMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := skillMap["name"].(string)
+		if strings.TrimSpace(name) == "" {
+			name, _ = skillMap["skill"].(string)
+		}
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		names = append(names, name)
+	}
+	return names
+}
+
+func normalizeToMap(raw interface{}) map[string]interface{} {
+	if raw == nil {
+		return map[string]interface{}{}
+	}
+	if m, ok := raw.(map[string]interface{}); ok {
+		return m
+	}
+	if s, ok := raw.(string); ok && strings.TrimSpace(s) != "" {
+		var parsed map[string]interface{}
+		if err := json.Unmarshal([]byte(s), &parsed); err == nil && len(parsed) > 0 {
+			return parsed
+		}
+	}
+	return toMap(raw)
+}
+
+func appendUniqueSkills(dst []string, seen map[string]bool, values ...string) []string {
+	for _, v := range values {
+		normalized := strings.TrimSpace(v)
+		if normalized == "" {
+			continue
+		}
+		key := strings.ToLower(normalized)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		dst = append(dst, normalized)
+	}
+	return dst
+}
+
+func deriveSkillsFromText(text string) []string {
+	low := strings.ToLower(text)
+	skills := []string{}
+	seen := map[string]bool{}
+	add := func(skill string) {
+		key := strings.ToLower(strings.TrimSpace(skill))
+		if key == "" || seen[key] {
+			return
+		}
+		seen[key] = true
+		skills = append(skills, skill)
+	}
+
+	if strings.Contains(low, "react") {
+		add("React")
+	}
+	if strings.Contains(low, "typescript") {
+		add("TypeScript")
+	}
+	if strings.Contains(low, "javascript") || strings.Contains(low, "es6") {
+		add("JavaScript")
+	}
+	if strings.Contains(low, "next.js") || strings.Contains(low, "nextjs") {
+		add("Next.js")
+	}
+	if strings.Contains(low, "state management") || strings.Contains(low, "redux") || strings.Contains(low, "zustand") || strings.Contains(low, "context api") {
+		add("State Management")
+	}
+	if strings.Contains(low, "test") || strings.Contains(low, "jest") || strings.Contains(low, "cypress") || strings.Contains(low, "testing library") {
+		add("Testing")
+	}
+	if strings.Contains(low, "performance") || strings.Contains(low, "optimiz") {
+		add("Performance Optimization")
+	}
+	if strings.Contains(low, "system design") || strings.Contains(low, "architecture") {
+		add("System Design")
+	}
+	if strings.Contains(low, "debug") || strings.Contains(low, "problem") {
+		add("Problem Solving")
+	}
+	if strings.Contains(low, "ci/cd") || strings.Contains(low, "deployment") || strings.Contains(low, "devops") {
+		add("CI/CD")
+	}
+	if strings.Contains(low, "api") {
+		add("APIs")
+	}
+	return skills
+}
+
+func GetLearningYouTubeSuggestions(c *gin.Context) {
+	journeyId := c.Param("journeyId")
+	refresh := c.Query("refresh") == "1"
+
+	var plan LearningPlan
+	_, err := db.Client.From("learning_plans").Select("*", "exact", false).Eq("journey_id", journeyId).Single().ExecuteTo(&plan)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Learning plan not found"})
+		return
+	}
+
+	planMap := toMap(plan.PlanData)
+	if !refresh {
+		if existingRaw, ok := planMap["youtube_suggestions"]; ok {
+			b, marshalErr := json.Marshal(existingRaw)
+			if marshalErr == nil {
+				var existing []models.LearningResource
+				if unmarshalErr := json.Unmarshal(b, &existing); unmarshalErr == nil && len(existing) > 0 {
+					c.JSON(http.StatusOK, YouTubeSuggestionResponse{YouTubeResources: existing})
+					return
+				}
+			}
+		}
+	}
+
+	skills := []string{}
+	seenSkills := map[string]bool{}
+
+	if rawFocus, ok := planMap["focus_skills"].([]interface{}); ok {
+		for _, s := range rawFocus {
+			if skill, ok := s.(string); ok && skill != "" {
+				skills = appendUniqueSkills(skills, seenSkills, skill)
+			}
+		}
+	}
+
+	// Fallback: infer from nodes[].data.skill
+	if rawNodes, ok := planMap["nodes"].([]interface{}); ok {
+		for _, n := range rawNodes {
+			nodeMap, ok := n.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			dataMap, _ := nodeMap["data"].(map[string]interface{})
+			if skill, ok := dataMap["skill"].(string); ok {
+				skills = appendUniqueSkills(skills, seenSkills, skill)
+			}
+		}
+	}
+
+	// Fallback: infer from existing youtube_resources skill tag
+	if rawResources, ok := planMap["youtube_resources"].([]interface{}); ok {
+		for _, r := range rawResources {
+			resourceMap, ok := r.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if skill, ok := resourceMap["skill"].(string); ok {
+				skills = appendUniqueSkills(skills, seenSkills, skill)
+			}
+		}
+	}
+
+	if len(skills) == 0 {
+		var journey models.Journey
+		_, jErr := db.Client.From("journeys").Select("analysis_result, role_name", "exact", false).Eq("id", journeyId).Single().ExecuteTo(&journey)
+		if jErr == nil {
+			if analysisMap := normalizeToMap(journey.AnalysisResult); len(analysisMap) > 0 {
+				for _, s := range extractSkillNamesFromAnalysis(analysisMap) {
+					skills = appendUniqueSkills(skills, seenSkills, s)
+				}
+			}
+			for _, s := range deriveSkillsFromText(journey.RoleName) {
+				skills = appendUniqueSkills(skills, seenSkills, s)
+			}
+		}
+	}
+
+	if len(skills) == 0 {
+		if rawTasks, ok := planMap["tasks"].([]interface{}); ok {
+			for _, t := range rawTasks {
+				if text, ok := t.(string); ok {
+					for _, s := range deriveSkillsFromText(text) {
+						skills = appendUniqueSkills(skills, seenSkills, s)
+					}
+				}
+			}
+		}
+		if rawNodes, ok := planMap["nodes"].([]interface{}); ok {
+			for _, n := range rawNodes {
+				nodeMap, ok := n.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				dataMap, _ := nodeMap["data"].(map[string]interface{})
+				if label, ok := dataMap["label"].(string); ok {
+					for _, s := range deriveSkillsFromText(label) {
+						skills = appendUniqueSkills(skills, seenSkills, s)
+					}
+				}
+			}
+		}
+	}
+
+	if len(skills) == 0 {
+		skills = append(skills, "Problem Solving", "System Design", "Interview Preparation")
+	}
+
+	youtubeResources, recErr := agents.RecommendYouTubeCourses(c.Request.Context(), skills, planMap, 8)
+	if recErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate YouTube suggestions: " + recErr.Error()})
+		return
+	}
+
+	planMap["youtube_suggestions"] = youtubeResources
+
+	_, _, err = db.Client.From("learning_plans").Update(map[string]interface{}{
+		"plan_data": planMap,
+	}, "", "").Eq("journey_id", journeyId).Execute()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save YouTube suggestions: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, YouTubeSuggestionResponse{YouTubeResources: youtubeResources})
 }

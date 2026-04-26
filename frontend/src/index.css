@@ -36,3 +36,44 @@
 .page-transition {
   @apply opacity-0 translate-y-4;
 }
+
+@keyframes gradientShift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-1.5%, 1%, 0) scale(1.02); }
+  100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes floatOrb {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+  100% { transform: translateY(0); }
+}
+
+.animated-login-bg {
+  background: linear-gradient(135deg, var(--color-background) 0%, rgba(230, 255, 250, 0.55) 45%, var(--color-background) 100%);
+  animation: gradientShift 9s ease-in-out infinite;
+}
+
+.float-orb {
+  animation: floatOrb 10s ease-in-out infinite;
+}
+
+.float-orb-delayed {
+  animation-duration: 12s;
+  animation-delay: 0.8s;
+}
+
+.float-orb-slow {
+  animation-duration: 14s;
+  animation-delay: 1.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-login-bg,
+  .float-orb,
+  .float-orb-delayed,
+  .float-orb-slow {
+    animation: none !important;
+    transform: none !important;
+  }
+}

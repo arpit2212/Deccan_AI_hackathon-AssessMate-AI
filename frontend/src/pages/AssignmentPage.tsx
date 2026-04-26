@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
@@ -29,6 +29,7 @@ interface Assignment {
 }
 
 export const AssignmentPage = () => {
+  const prefersReducedMotion = useReducedMotion()
   const { journeyId } = useParams()
   const { session } = useAuth()
   const navigate = useNavigate()
@@ -258,8 +259,13 @@ export const AssignmentPage = () => {
   const isCorrect = selectedAnswer === currentQuestion.correct_answer
 
   return (
-    <div className="max-w-4xl mx-auto py-8">
-      <div className="flex justify-between items-end mb-8">
+    <motion.div
+      initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0, 0, 0.2, 1] }}
+      className="max-w-4xl mx-auto py-6 sm:py-8"
+    >
+      <div className="flex flex-col sm:flex-row gap-3 sm:justify-between sm:items-end mb-8">
         <div className="space-y-1">
           <h1 className="text-2xl font-bold text-text-primary">{isReviewMode ? 'Assignment Review' : 'Skill Assessment'}</h1>
           <p className="text-text-secondary">Question {currentQuestionIndex + 1} of {assignment.questions.length}</p>
@@ -281,12 +287,12 @@ export const AssignmentPage = () => {
       <AnimatePresence mode="wait">
         <motion.div
           key={currentQuestionIndex}
-          initial={{ opacity: 0, x: 20 }}
+          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : 20 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.2 }}
+          exit={{ opacity: 0, x: prefersReducedMotion ? 0 : -20 }}
+          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
         >
-          <Card className="p-8 space-y-8">
+          <Card className="p-5 sm:p-8 space-y-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] uppercase font-bold text-primary px-2 py-0.5 bg-primary/5 rounded">
@@ -315,7 +321,7 @@ export const AssignmentPage = () => {
                           : 'border-primary bg-primary/5')
                         : (isReviewMode && option === currentQuestion.correct_answer)
                         ? 'border-green-400 bg-green-50'
-                        : 'border-gray-100 hover:border-primary/30 hover:bg-gray-50'
+                        : 'border-gray-100 hover:border-primary/30 hover:bg-primary/5 hover:-translate-y-px'
                     }`}
                   >
                     <div className="flex items-center gap-4">
@@ -336,7 +342,7 @@ export const AssignmentPage = () => {
                   onChange={(e) => !isReviewMode && handleAnswerSelect(e.target.value)}
                   placeholder="Type your answer or approach here..."
                   readOnly={isReviewMode}
-                  className="w-full h-40 p-4 rounded-xl border-2 border-gray-100 focus:border-primary outline-none resize-none font-medium"
+                  className="w-full h-40 p-4 rounded-xl border-2 border-gray-100 focus:border-primary outline-none resize-none font-medium bg-white"
                 />
               )}
             </div>
@@ -362,6 +368,7 @@ export const AssignmentPage = () => {
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentQuestionIndex === 0}
+                className="transition-all duration-200 hover:border-primary/40"
               >
                 Previous
               </Button>
@@ -375,6 +382,7 @@ export const AssignmentPage = () => {
                   onClick={handleSubmit} 
                   isLoading={isSubmitting}
                   disabled={!selectedAnswer}
+                  className="transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
                 >
                   Submit Assessment
                 </Button>
@@ -382,6 +390,7 @@ export const AssignmentPage = () => {
                 <Button 
                   onClick={handleNext}
                   disabled={!selectedAnswer}
+                  className="transition-all duration-200 hover:-translate-y-px hover:shadow-sm"
                 >
                   Next Question <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
@@ -408,6 +417,6 @@ export const AssignmentPage = () => {
           </button>
         ))}
       </div>
-    </div>
+    </motion.div>
   )
 }

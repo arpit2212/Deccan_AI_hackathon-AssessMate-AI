@@ -1,22 +1,37 @@
 import React from 'react'
 import * as Avatar from '@radix-ui/react-avatar'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { LogOut, User as UserIcon, Settings, ChevronDown } from 'lucide-react'
+import { LogOut, ChevronDown, Menu } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
+import { motion, useReducedMotion } from 'framer-motion'
 
-export const Navbar: React.FC = () => {
+interface NavbarProps {
+  onOpenMobileSidebar?: () => void
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onOpenMobileSidebar }) => {
   const { user, signOut } = useAuth()
+  const prefersReducedMotion = useReducedMotion()
 
   return (
-    <header className="h-16 border-b border-gray-100 bg-white flex items-center justify-between px-8 sticky top-0 z-10">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-bold text-primary">AssessMate</h2>
-      </div>
+    <motion.header
+      initial={{ opacity: 0, y: prefersReducedMotion ? 0 : -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0, 0, 0.2, 1] }}
+      className="h-16 border-b border-primary/10 bg-white flex items-center justify-between px-4 sm:px-8 sticky top-0 z-20"
+    >
+      <button
+        onClick={onOpenMobileSidebar}
+        className="md:hidden h-10 w-10 rounded-lg border border-gray-200 flex items-center justify-center text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
+        aria-label="Open menu"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 ml-auto">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
-            <button className="flex items-center gap-2 hover:bg-gray-50 p-1.5 rounded-lg transition-colors outline-none">
+            <button className="flex items-center gap-2 hover:bg-primary/10 p-1.5 rounded-lg transition-colors duration-200 outline-none">
               <Avatar.Root className="h-8 w-8 rounded-full overflow-hidden bg-primary-light flex items-center justify-center">
                 <Avatar.Image src={user?.avatar_url} alt={user?.full_name} className="h-full w-full object-cover" />
                 <Avatar.Fallback className="text-primary font-bold text-sm">
@@ -36,15 +51,6 @@ export const Navbar: React.FC = () => {
               className="min-w-[200px] bg-white rounded-xl shadow-lg p-1.5 border border-gray-100 animate-in fade-in slide-in-from-top-2 z-50"
               sideOffset={5}
             >
-              <DropdownMenu.Item className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-gray-50 rounded-lg cursor-pointer outline-none">
-                <UserIcon className="h-4 w-4" />
-                Profile
-              </DropdownMenu.Item>
-              <DropdownMenu.Item className="flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-gray-50 rounded-lg cursor-pointer outline-none">
-                <Settings className="h-4 w-4" />
-                Settings
-              </DropdownMenu.Item>
-              <DropdownMenu.Separator className="h-px bg-gray-100 my-1" />
               <DropdownMenu.Item
                 onClick={signOut}
                 className="flex items-center gap-2 px-3 py-2 text-sm text-error hover:bg-red-50 rounded-lg cursor-pointer outline-none"
@@ -56,6 +62,6 @@ export const Navbar: React.FC = () => {
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </div>
-    </header>
+    </motion.header>
   )
 }

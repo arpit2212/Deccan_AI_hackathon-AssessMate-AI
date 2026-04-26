@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../context/AuthContext'
+import { Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const API_URL = 'http://localhost:8080/api'
@@ -14,28 +16,69 @@ function useQuery() {
 
 type Skill = { name: string; gap: number }
 
+const parseAnalysisResult = (raw: any): any => {
+  if (!raw) return null
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+  return raw
+}
+
 export const UpskillAssignmentPage = () => {
+  const prefersReducedMotion = useReducedMotion()
   const q = useQuery()
   const navigate = useNavigate()
   const { session } = useAuth()
-  const journeyId = q.get('journey') || ''
+  const journeyIdFromQuery = q.get('journey') || ''
+  const [activeJourneyId, setActiveJourneyId] = useState<string>(journeyIdFromQuery)
   const [skills, setSkills] = useState<Skill[]>([])
   const [selected, setSelected] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const load = async () => {
-      if (!journeyId || !session?.access_token) return
+      if (!session?.access_token) return
+
+      let resolvedJourneyId = journeyIdFromQuery
+      if (!resolvedJourneyId) {
+        const listRes = await fetch(`${API_URL}/assignments`, {
+          headers: { Authorization: `Bearer ${session.access_token}` }
+        })
+        const listBody = await listRes.json().catch(() => ({} as any))
+        if (listRes.ok) {
+          const completed = Array.isArray(listBody?.completed) ? listBody.completed : []
+          const pending = Array.isArray(listBody?.pending) ? listBody.pending : []
+          resolvedJourneyId = String(completed[0]?.journey_id || pending[0]?.journey_id || '').trim()
+        }
+      }
+      if (!resolvedJourneyId) {
+        setSkills([])
+        return
+      }
+      setActiveJourneyId(resolvedJourneyId)
+
       try {
-        const res = await fetch(`${API_URL}/journeys/${journeyId}`, {
+        const res = await fetch(`${API_URL}/journeys/${resolvedJourneyId}`, {
           headers: { Authorization: `Bearer ${session.access_token}` }
         })
         if (res.ok) {
           const body = await res.json().catch(() => ({} as any))
-          const sa = body?.analysis_result?.skill_analysis ?? []
+          const analysis = parseAnalysisResult(body?.analysis_result)
+          const sa = analysis?.skill_analysis ?? []
           const gaps: Skill[] = sa
-            .filter((x: any) => (x?.gap ?? 0) > 0)
-            .map((x: any) => ({ name: x?.name ?? '', gap: x?.gap ?? 0 }))
+            .map((x: any) => {
+              const required = Number(x?.required_level ?? x?.requiredLevel ?? 0)
+              const estimated = Number(x?.estimated_level ?? x?.estimatedLevel ?? x?.current_level ?? x?.currentLevel ?? 0)
+              const inferredGap = Math.max(0, required - estimated)
+              const gapValue = Number(x?.gap ?? inferredGap)
+              const name = String(x?.name ?? x?.skill ?? '').trim()
+              return { name, gap: Math.max(0, gapValue) }
+            })
+            .filter((x: Skill) => x.gap > 0)
             .filter((x: Skill) => x.name)
           if (gaps.length > 0) {
             setSkills(gaps)
@@ -44,7 +87,7 @@ export const UpskillAssignmentPage = () => {
         }
 
         // Fallback: derive weak skills from assignment performance/history if journey gaps are unavailable
-        const aRes = await fetch(`${API_URL}/assignment/${journeyId}`, {
+        const aRes = await fetch(`${API_URL}/assignment/${resolvedJourneyId}`, {
           headers: { Authorization: `Bearer ${session.access_token}` }
         })
         const aBody = await aRes.json().catch(() => ({} as any))
@@ -88,24 +131,28 @@ export const UpskillAssignmentPage = () => {
       }
     }
     load()
-  }, [journeyId, session?.access_token])
+  }, [journeyIdFromQuery, session?.access_token])
 
   const startUpskill = async () => {
     if (!selected) {
       toast.error('Select one skill to focus on')
       return
     }
+    if (!activeJourneyId) {
+      toast.error('No journey found for upskill')
+      return
+    }
     if (!session?.access_token) return
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/assignment/${journeyId}/reattempt?skill=${encodeURIComponent(selected)}`, {
+      const res = await fetch(`${API_URL}/assignment/${activeJourneyId}/reattempt?skill=${encodeURIComponent(selected)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` }
       })
       const body = await res.json().catch(() => ({} as any))
       if (!res.ok) throw new Error(body.error || 'Failed to start upskill attempt')
       toast.success('New upskill attempt created')
-      navigate(`/assignment/${journeyId}`)
+      navigate(`/assignment/${activeJourneyId}`)
     } catch (e) {
       console.error(e)
       toast.error((e as any)?.message || 'Failed to start upskill attempt')
@@ -115,45 +162,54 @@ export const UpskillAssignmentPage = () => {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8 space-y-6">
-      <div>
+    <motion.div
+      initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0, 0, 0.2, 1] }}
+      className="max-w-3xl mx-auto py-6 sm:py-8 space-y-6"
+    >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35, delay: 0.05 }}>
         <h1 className="text-2xl font-bold text-text-primary">Upskill Assignment</h1>
         <p className="text-text-secondary">
           Pick one weak skill. We’ll generate a focused re-attempt and update your learning plan after completion.
         </p>
-      </div>
+      </motion.div>
 
-      <Card className="p-6 space-y-4">
-        <h2 className="font-bold text-text-primary">Choose a focus skill</h2>
+      <Card className="p-5 sm:p-6 space-y-4 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300">
+        <h2 className="font-bold text-text-primary flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" /> Choose a focus skill
+        </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {skills.length === 0 ? (
             <p className="text-sm text-text-secondary">No gaps found for this journey.</p>
           ) : (
             skills.map((s) => (
-              <button
+              <motion.button
                 key={s.name}
                 onClick={() => setSelected(s.name)}
+                whileHover={prefersReducedMotion ? {} : { y: -2 }}
+                transition={{ duration: 0.2, ease: [0, 0, 0.2, 1] }}
                 className={`p-4 rounded-xl border text-left transition-all ${
-                  selected === s.name ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-primary/30'
+                  selected === s.name ? 'border-primary bg-primary/5 shadow-sm' : 'border-gray-100 hover:border-primary/30 hover:bg-primary/5'
                 }`}
               >
                 <p className="font-bold text-text-primary">{s.name}</p>
                 <p className="text-xs text-text-secondary">Gap: {s.gap}</p>
-              </button>
+              </motion.button>
             ))
           )}
         </div>
 
-        <div className="flex gap-3 pt-2">
-          <Button variant="outline" onClick={() => navigate('/assignments')}>
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => navigate('/assignments')}>
             Back
           </Button>
-          <Button onClick={startUpskill} isLoading={loading} disabled={!journeyId}>
+          <Button className="w-full sm:w-auto hover:-translate-y-px hover:shadow-sm transition-all duration-200" onClick={startUpskill} isLoading={loading} disabled={!activeJourneyId}>
             Start upskill attempt
           </Button>
         </div>
       </Card>
-    </div>
+    </motion.div>
   )
 }
 
