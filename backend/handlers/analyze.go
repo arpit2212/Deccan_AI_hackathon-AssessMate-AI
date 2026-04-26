@@ -86,3 +86,34 @@ func Analyze(c *gin.Context) {
 		"company":    compOutput.Company,
 	})
 }
+
+func GetUserJourneys(c *gin.Context) {
+	userId, exists := c.Get("userId")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var journeys []Journey
+	_, err := db.Client.From("journeys").Select("*", "exact", false).Eq("user_id", userId.(string)).ExecuteTo(&journeys)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch journeys: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, journeys)
+}
+
+func GetJourney(c *gin.Context) {
+	journeyId := c.Param("journeyId")
+	userId, _ := c.Get("userId")
+
+	var journey Journey
+	_, err := db.Client.From("journeys").Select("*", "exact", false).Eq("id", journeyId).Eq("user_id", userId.(string)).Single().ExecuteTo(&journey)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Journey not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, journey)
+}

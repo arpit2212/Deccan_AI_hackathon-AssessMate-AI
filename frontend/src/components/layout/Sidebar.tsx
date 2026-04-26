@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Compass, Settings, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Compass, PlusCircle, FileText, BookOpen, Settings, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 export const Sidebar: React.FC = () => {
@@ -8,9 +8,11 @@ export const Sidebar: React.FC = () => {
 
   const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
-    { icon: Compass, label: 'Journeys', path: '/journeys' },
+    { icon: Compass, label: 'My Journeys', path: '/journeys' },
+    { icon: PlusCircle, label: 'New Journey', path: '/journeys/new' },
+    { icon: FileText, label: 'Assignment', path: '/assignment' },
+    { icon: BookOpen, label: 'Learning Plan', path: '/learning-plan' },
     { icon: Settings, label: 'Settings', path: '/settings' },
-    { icon: HelpCircle, label: 'Help', path: '/help' },
   ]
 
   return (
