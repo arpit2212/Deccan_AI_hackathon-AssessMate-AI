@@ -28,6 +28,8 @@ interface Assignment {
   }>
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
 export const AssignmentPage = () => {
   const prefersReducedMotion = useReducedMotion()
   const { journeyId } = useParams()
@@ -44,7 +46,7 @@ export const AssignmentPage = () => {
   useEffect(() => {
     const fetchAssignment = async () => {
       try {
-        const response = await fetch(`http://localhost:8080/api/assignment/${journeyId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/assignment/${journeyId}`, {
           headers: {
             'Authorization': `Bearer ${session?.access_token}`
           }
@@ -137,7 +139,7 @@ export const AssignmentPage = () => {
         level: Math.round((data.correct / data.total) * 10)
       }))
 
-      const response = await fetch('http://localhost:8080/api/assignment/submit', {
+      const response = await fetch(`${API_BASE_URL}/api/assignment/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

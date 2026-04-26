@@ -8,7 +8,7 @@ import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
 import type { AnalyzeResponse, SkillMatch } from '../types'
 
-const API_URL = 'http://localhost:8080/api'
+const API_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api`
 
 export const NewJourneyPage: React.FC = () => {
   const { session } = useAuth()

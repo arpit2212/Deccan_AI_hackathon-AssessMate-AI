@@ -31,6 +31,8 @@ interface PlanData {
   }>
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
 export const LearningPlanPage = () => {
   const { journeyId } = useParams()
   const { session } = useAuth()
@@ -58,7 +60,7 @@ export const LearningPlanPage = () => {
   useEffect(() => {
     const fetchPlan = async () => {
       try {
-        const response = await fetch(`http://localhost:8080/api/learning-plan/${journeyId}?time=4 weeks, 15 hours/week`, {
+        const response = await fetch(`${API_BASE_URL}/api/learning-plan/${journeyId}?time=4 weeks, 15 hours/week`, {
           headers: {
             'Authorization': `Bearer ${session?.access_token}`
           }

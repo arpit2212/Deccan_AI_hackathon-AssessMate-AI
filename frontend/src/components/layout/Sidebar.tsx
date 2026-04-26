@@ -55,16 +55,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen = false, onCloseMob
       <div className="h-16 flex items-center px-6 mb-4">
         {!isCollapsed && (
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white text-sm font-extrabold">
-              AM
-            </div>
+            <img
+              src="/logo.png"
+              alt="AssessMate logo"
+              className="h-8 w-8 rounded-lg object-cover"
+            />
             <h1 className="text-xl font-bold text-primary">AssessMate</h1>
           </div>
         )}
         {isCollapsed && (
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-white text-sm font-extrabold mx-auto">
-            AM
-          </div>
+          <img
+            src="/logo.png"
+            alt="AssessMate logo"
+            className="h-8 w-8 rounded-lg object-cover mx-auto"
+          />
         )}
       </div>
 

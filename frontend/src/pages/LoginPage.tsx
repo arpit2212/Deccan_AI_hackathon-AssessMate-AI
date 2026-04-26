@@ -77,9 +77,11 @@ export const LoginPage: React.FC = () => {
             transition={{ duration: 0.2, ease: easeOutCurve }}
             className="inline-block p-2.5 sm:p-3 bg-primary-light rounded-2xl mb-4"
           >
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary rounded-xl flex items-center justify-center text-white text-lg sm:text-xl font-extrabold tracking-tight">
-              AM
-            </div>
+            <img
+              src="/logo.png"
+              alt="AssessMate logo"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl object-cover"
+            />
           </motion.div>
           <motion.h1 variants={fadeUp(0.25)} className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2 text-primary">
             AssessMate

@@ -15,6 +15,8 @@ interface Journey {
   analysis_result: any
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
 const CountUp: React.FC<{ value: number; delay?: number }> = ({ value, delay = 0 }) => {
   const [display, setDisplay] = useState(0)
 
@@ -46,7 +48,7 @@ export const DashboardPage: React.FC = () => {
   useEffect(() => {
     const fetchJourneys = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/journeys', {
+        const response = await fetch(`${API_BASE_URL}/api/journeys`, {
           headers: {
             'Authorization': `Bearer ${session?.access_token}`
           }

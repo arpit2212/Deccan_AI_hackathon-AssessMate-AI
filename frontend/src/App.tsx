@@ -18,6 +18,8 @@ import { UpskillAssignmentPage } from './pages/UpskillAssignmentPage'
 import { useEffect } from 'react'
 import { Spinner } from './components/ui/Spinner'
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
 const RedirectToLatest = ({ type }: { type: 'assignment' | 'learning-plan' }) => {
   const { session } = useAuth()
   const navigate = useNavigate()
@@ -25,7 +27,7 @@ const RedirectToLatest = ({ type }: { type: 'assignment' | 'learning-plan' }) =>
   useEffect(() => {
     const fetchLatest = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/journeys', {
+        const response = await fetch(`${API_BASE_URL}/api/journeys`, {
           headers: {
             'Authorization': `Bearer ${session?.access_token}`
           }

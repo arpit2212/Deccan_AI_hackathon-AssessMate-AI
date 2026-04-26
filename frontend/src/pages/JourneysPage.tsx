@@ -18,6 +18,8 @@ interface Journey {
   }
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+
 export const JourneysPage: React.FC = () => {
   const [journeys, setJourneys] = useState<Journey[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,7 +29,7 @@ export const JourneysPage: React.FC = () => {
   useEffect(() => {
     const fetchJourneys = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/journeys', {
+        const response = await fetch(`${API_BASE_URL}/api/journeys`, {
           headers: {
             'Authorization': `Bearer ${session?.access_token}`
           }

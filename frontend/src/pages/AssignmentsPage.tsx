@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext'
 import { CheckCircle2, Circle, ChevronRight, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const API_URL = 'http://localhost:8080/api'
+const API_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/api`
 
 type AssignmentListItem = {
   journey_id: string
