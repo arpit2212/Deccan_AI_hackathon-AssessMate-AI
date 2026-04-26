@@ -18,9 +18,27 @@ type Assignment struct {
 	ID        string      `json:"id,omitempty"`
 	JourneyID string      `json:"journey_id"`
 	Questions interface{} `json:"questions"`
+	Attempts  []AssignmentAttempt `json:"attempts,omitempty"`
 	Score     int         `json:"score"`
 	Status    string      `json:"status"`
 	CreatedAt time.Time   `json:"created_at"`
+}
+
+type AssignmentAttempt struct {
+	AttemptNumber int               `json:"attempt_number"`
+	Score         int               `json:"score"`
+	Skills        []map[string]any  `json:"skills,omitempty"`
+	Answers       map[string]string `json:"answers,omitempty"`
+	SubmittedAt   time.Time         `json:"submitted_at"`
+}
+
+// We store assignment metadata inside the existing jsonb column `assignments.questions`
+// to avoid requiring a DB migration.
+type AssignmentPayload struct {
+	Questions   []models.AssessmentQuestion `json:"questions"`
+	Attempts    []AssignmentAttempt         `json:"attempts,omitempty"`
+	FocusSkill  string                      `json:"focus_skill,omitempty"`
+	GeneratedAt time.Time                   `json:"generated_at,omitempty"`
 }
 
 type SubmitAssignmentRequest struct {
@@ -30,9 +48,51 @@ type SubmitAssignmentRequest struct {
 		Name  string `json:"name"`
 		Level int    `json:"level"`
 	} `json:"skills"`
+	Answers map[string]string `json:"answers,omitempty"`
+}
+
+type AssignmentListItem struct {
+	JourneyID   string `json:"journey_id"`
+	RoleName    string `json:"role_name"`
+	CompanyName string `json:"company_name"`
+	Status      string `json:"status"`
+	Attempts    int    `json:"attempts"`
+	Score       int    `json:"score"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+func parseAssignmentPayload(v interface{}) (*AssignmentPayload, error) {
+	// Handles both:
+	// 1) old format: []questions
+	// 2) new format: { questions: [...], attempts: [...] }
+	b, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	// Try new format first
+	var p AssignmentPayload
+	if err := json.Unmarshal(b, &p); err == nil && len(p.Questions) > 0 {
+		return &p, nil
+	}
+	// Try legacy array format
+	var qs []models.AssessmentQuestion
+	if err := json.Unmarshal(b, &qs); err != nil {
+		return nil, err
+	}
+	return &AssignmentPayload{Questions: qs, Attempts: []AssignmentAttempt{}}, nil
 }
 
 func parseFinalAnalysis(v interface{}) (*models.FinalAnalysis, error) {
+	if v == nil {
+		return nil, io.EOF
+	}
+	// Some rows can store jsonb as string; try direct parse first.
+	if s, ok := v.(string); ok {
+		var out models.FinalAnalysis
+		if err := json.Unmarshal([]byte(s), &out); err == nil {
+			return &out, nil
+		}
+	}
 	// Supabase returns jsonb as map[string]any; marshal/unmarshal is the safest way
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -93,6 +153,11 @@ func GetOrCreateAssignment(c *gin.Context) {
 	var existingAssignment Assignment
 	_, err := db.Client.From("assignments").Select("*", "exact", false).Eq("journey_id", journeyId).Single().ExecuteTo(&existingAssignment)
 	if err == nil {
+		// Normalize response shape for UI
+		if p, pErr := parseAssignmentPayload(existingAssignment.Questions); pErr == nil {
+			existingAssignment.Questions = p.Questions
+			existingAssignment.Attempts = p.Attempts
+		}
 		c.JSON(http.StatusOK, existingAssignment)
 		return
 	}
@@ -137,9 +202,14 @@ func GetOrCreateAssignment(c *gin.Context) {
 	}
 
 	// 5. Save assignment
+	payload := AssignmentPayload{
+		Questions:   questions.Questions,
+		Attempts:    []AssignmentAttempt{},
+		GeneratedAt: time.Now(),
+	}
 	newAssignment := Assignment{
 		JourneyID: journeyId,
-		Questions: questions.Questions,
+		Questions: payload,
 		Status:    "pending",
 	}
 
@@ -150,7 +220,183 @@ func GetOrCreateAssignment(c *gin.Context) {
 		return
 	}
 
+	savedAssignment.Questions = payload.Questions
+	savedAssignment.Attempts = payload.Attempts
 	c.JSON(http.StatusOK, savedAssignment)
+}
+
+func ListAssignments(c *gin.Context) {
+	userId, _ := c.Get("userId")
+	uid, _ := userId.(string)
+	if strings.TrimSpace(uid) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Fetch journeys for this user
+	var journeys []models.Journey
+	_, err := db.Client.From("journeys").Select("*", "exact", false).Eq("user_id", uid).Order("created_at", nil).ExecuteTo(&journeys)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch journeys"})
+		return
+	}
+
+	completed := []AssignmentListItem{}
+	pending := []AssignmentListItem{}
+
+	for _, j := range journeys {
+		var a Assignment
+		_, aErr := db.Client.From("assignments").Select("*", "exact", false).Eq("journey_id", j.ID).Single().ExecuteTo(&a)
+		if aErr != nil {
+			// No assignment yet => pending
+			pending = append(pending, AssignmentListItem{
+				JourneyID:   j.ID,
+				RoleName:    j.RoleName,
+				CompanyName: j.CompanyName,
+				Status:      "not_started",
+				Attempts:    0,
+				Score:       0,
+				CreatedAt:   j.CreatedAt,
+			})
+			continue
+		}
+		attempts := 0
+		if p, pErr := parseAssignmentPayload(a.Questions); pErr == nil {
+			attempts = len(p.Attempts)
+		}
+		item := AssignmentListItem{
+			JourneyID:   j.ID,
+			RoleName:    j.RoleName,
+			CompanyName: j.CompanyName,
+			Status:      a.Status,
+			Attempts:    attempts,
+			Score:       a.Score,
+			CreatedAt:   a.CreatedAt,
+		}
+		if strings.ToLower(a.Status) == "completed" {
+			completed = append(completed, item)
+		} else {
+			pending = append(pending, item)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"completed": completed,
+		"pending":   pending,
+	})
+}
+
+func ReattemptAssignment(c *gin.Context) {
+	journeyId := c.Param("journeyId")
+	focusSkill := strings.TrimSpace(c.Query("skill"))
+
+	// Fetch journey
+	var journey models.Journey
+	_, err := db.Client.From("journeys").Select("*", "exact", false).Eq("id", journeyId).Single().ExecuteTo(&journey)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Journey not found"})
+		return
+	}
+
+	// Use skill gaps from current analysis_result
+	finalAnalysis, err := parseFinalAnalysis(journey.AnalysisResult)
+	var skillGaps []models.SkillMatch
+	if err == nil && finalAnalysis != nil {
+		for _, s := range finalAnalysis.SkillAnalysis {
+			if focusSkill != "" {
+				if strings.EqualFold(strings.TrimSpace(s.Name), focusSkill) {
+					skillGaps = append(skillGaps, s)
+				}
+				continue
+			}
+			if s.Gap > 0 {
+				skillGaps = append(skillGaps, s)
+			}
+		}
+	}
+	// Fallback: if analysis_result is malformed or doesn't have gaps, still allow selected-skill upskill.
+	if len(skillGaps) == 0 && focusSkill != "" {
+		skillGaps = append(skillGaps, models.SkillMatch{
+			Name:           focusSkill,
+			RequiredLevel:  7,
+			EstimatedLevel: 3,
+			Gap:            4,
+			Importance:     "critical",
+			Evidence:       "Selected by user for upskill reattempt",
+		})
+	}
+	if len(skillGaps) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No matching skill gaps found for reattempt"})
+		return
+	}
+
+	companyCtx := ""
+	if journey.CompanyContext != nil {
+		if comp, err := json.Marshal(journey.CompanyContext); err == nil {
+			var cctx models.CompanyOutput
+			if json.Unmarshal(comp, &cctx) == nil {
+				companyCtx = cctx.CompanyContext
+			}
+		}
+	}
+
+	ctx := context.Background()
+	questions, err := agents.GenerateAssignmentQuestions(ctx, skillGaps, companyCtx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate questions: " + err.Error()})
+		return
+	}
+
+	// Fetch existing assignment to preserve attempt history
+	var existing Assignment
+	_, aErr := db.Client.From("assignments").Select("*", "exact", false).Eq("journey_id", journeyId).Single().ExecuteTo(&existing)
+	var payload AssignmentPayload
+	if aErr == nil {
+		if p, pErr := parseAssignmentPayload(existing.Questions); pErr == nil {
+			payload.Attempts = p.Attempts
+		}
+	}
+	payload.Questions = questions.Questions
+	payload.FocusSkill = focusSkill
+	payload.GeneratedAt = time.Now()
+
+	// Upsert style: update if exists else insert
+	if aErr == nil {
+		_, _, err = db.Client.From("assignments").Update(map[string]any{
+			"questions": payload,
+			"status":    "pending",
+			"score":     0,
+		}, "", "").Eq("journey_id", journeyId).Execute()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset assignment: " + err.Error()})
+			return
+		}
+		var updated Assignment
+		_, err = db.Client.From("assignments").Select("*", "exact", false).Eq("journey_id", journeyId).Single().ExecuteTo(&updated)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Reattempt created but failed to fetch updated assignment: " + err.Error()})
+			return
+		}
+		updated.Questions = questions.Questions
+		updated.Attempts = payload.Attempts
+		c.JSON(http.StatusOK, updated)
+		return
+	}
+
+	newAssignment := Assignment{
+		JourneyID: journeyId,
+		Questions: payload,
+		Status:    "pending",
+	}
+	var saved Assignment
+	_, err = db.Client.From("assignments").Insert(newAssignment, false, "", "", "").Single().ExecuteTo(&saved)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create assignment: " + err.Error()})
+		return
+	}
+	saved.Questions = questions.Questions
+	saved.Attempts = payload.Attempts
+	c.JSON(http.StatusOK, saved)
 }
 
 func SubmitAssignment(c *gin.Context) {
@@ -168,9 +414,35 @@ func SubmitAssignment(c *gin.Context) {
 	}
 
 	// 1. Update assignment status
+	var current Assignment
+	_, cErr := db.Client.From("assignments").Select("*", "exact", false).Eq("journey_id", req.JourneyID).Single().ExecuteTo(&current)
+	if cErr != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Assignment not found"})
+		return
+	}
+
+	payload, _ := parseAssignmentPayload(current.Questions)
+	attemptNum := len(payload.Attempts) + 1
+	attempt := AssignmentAttempt{
+		AttemptNumber: attemptNum,
+		Score:         req.Score,
+		SubmittedAt:   time.Now(),
+		Answers:       req.Answers,
+	}
+	// store skills as generic map so we don't lock schema
+	if len(req.Skills) > 0 {
+		var skillMaps []map[string]any
+		for _, s := range req.Skills {
+			skillMaps = append(skillMaps, map[string]any{"name": s.Name, "level": s.Level})
+		}
+		attempt.Skills = skillMaps
+	}
+	payload.Attempts = append(payload.Attempts, attempt)
+
 	_, _, err := db.Client.From("assignments").Update(map[string]interface{}{
 		"score":  req.Score,
 		"status": "completed",
+		"questions": payload,
 	}, "", "").Eq("journey_id", req.JourneyID).Execute()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update assignment status: " + err.Error()})

@@ -9,8 +9,12 @@ import { DashboardPage } from './pages/DashboardPage'
 import { JourneysPage } from './pages/JourneysPage'
 import { NewJourneyPage } from './pages/NewJourneyPage'
 import { AssignmentPage } from './pages/AssignmentPage'
+import { AssignmentsPage } from './pages/AssignmentsPage'
+import { LearningPlansPage } from './pages/LearningPlansPage'
 import { LearningPlanPage } from './pages/LearningPlanPage'
+import { StartLearningPage } from './pages/StartLearningPage'
 import { AgentsPage } from './pages/AgentsPage'
+import { UpskillAssignmentPage } from './pages/UpskillAssignmentPage'
 import { useEffect } from 'react'
 import { Spinner } from './components/ui/Spinner'
 
@@ -73,8 +77,11 @@ function App() {
             <Route path="/journeys/new" element={<NewJourneyPage />} />
             <Route path="/assignment" element={<RedirectToLatest type="assignment" />} />
             <Route path="/assignment/:journeyId" element={<AssignmentPage />} />
-            <Route path="/learning-plan" element={<RedirectToLatest type="learning-plan" />} />
+            <Route path="/assignments" element={<AssignmentsPage />} />
+            <Route path="/upskill-assignment" element={<UpskillAssignmentPage />} />
+            <Route path="/learning-plan" element={<LearningPlansPage />} />
             <Route path="/learning-plan/:journeyId" element={<LearningPlanPage />} />
+            <Route path="/start-learning/:journeyId" element={<StartLearningPage />} />
             <Route path="/agents" element={<AgentsPage />} />
             {/* Redirect /app or other unknown routes to dashboard */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

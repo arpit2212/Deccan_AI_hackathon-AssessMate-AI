@@ -94,7 +94,7 @@ func GetJourneys(c *gin.Context) {
 }
 
 func GetJourney(c *gin.Context) {
-	id := c.Param("id")
+	id := c.Param("journeyId")
 	userId, _ := c.Get("userId")
 
 	var journey models.Journey

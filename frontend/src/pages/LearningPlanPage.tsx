@@ -1,18 +1,34 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ReactFlow, Background, Controls, type Node, type Edge } from '@xyflow/react'
+import { ReactFlow, Background, Controls, MiniMap, Panel, type Node, type Edge } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { motion } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Loader2, ArrowLeft, Target, Calendar, CheckCircle2 } from 'lucide-react'
+import { Loader2, ArrowLeft, Target, Calendar, CheckCircle2, Video, Clock3, BarChart3 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface PlanData {
+  title?: string
+  summary?: string
+  estimated_weeks?: number
+  focus_skills?: string[]
   nodes: Node[]
   edges: Edge[]
   tasks: string[]
+  analytics?: {
+    total_hours?: number
+    difficulty_mix?: Record<string, number>
+    skill_coverage?: Array<{ skill: string; hours: number; target_level?: number }>
+    weekly_milestones?: string[]
+  }
+  youtube_resources?: Array<{
+    title: string
+    url: string
+    skill: string
+    duration?: string
+  }>
 }
 
 export const LearningPlanPage = () => {
@@ -22,6 +38,21 @@ export const LearningPlanPage = () => {
   const [plan, setPlan] = useState<PlanData | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const phaseColor = (phase?: string) => {
+    switch ((phase || '').toLowerCase()) {
+      case 'foundation':
+        return '#3b82f6'
+      case 'applied':
+        return '#22c55e'
+      case 'advanced':
+        return '#f59e0b'
+      case 'simulation':
+        return '#a855f7'
+      default:
+        return '#64748b'
+    }
+  }
+
   useEffect(() => {
     const fetchPlan = async () => {
       try {
@@ -30,12 +61,32 @@ export const LearningPlanPage = () => {
             'Authorization': `Bearer ${session?.access_token}`
           }
         })
-        if (!response.ok) throw new Error('Failed to fetch plan')
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({} as any))
+          throw new Error(errData.error || 'Failed to fetch plan')
+        }
         const data = await response.json()
-        setPlan(data.plan_data)
+        const rawPlan: PlanData = data.plan_data
+        const coloredNodes: Node[] = (rawPlan?.nodes ?? []).map((n: any) => {
+          const phase = n?.data?.phase
+          const color = phaseColor(phase)
+          return {
+            ...n,
+            style: {
+              ...(n.style || {}),
+              border: `2px solid ${color}`,
+              borderRadius: 14,
+              background: `${color}12`,
+              color: '#0f172a',
+              padding: 6,
+              width: 240
+            }
+          }
+        })
+        setPlan({ ...rawPlan, nodes: coloredNodes })
       } catch (error) {
         console.error(error)
-        toast.error('Failed to load learning plan')
+        toast.error((error as any)?.message || 'Failed to load learning plan')
       } finally {
         setLoading(false)
       }
@@ -63,13 +114,13 @@ export const LearningPlanPage = () => {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-text-primary">Personalized Learning Plan</h1>
+            <h1 className="text-2xl font-bold text-text-primary">{plan?.title || 'Personalized Learning Plan'}</h1>
             <p className="text-text-secondary flex items-center gap-2">
-              <Calendar className="h-4 w-4" /> 4 Week Intensive Roadmap
+              <Calendar className="h-4 w-4" /> {plan?.estimated_weeks || 4} Week Intensive Roadmap
             </p>
           </div>
         </div>
-        <Button className="bg-primary text-white">
+        <Button className="bg-primary text-white" onClick={() => navigate(`/start-learning/${journeyId}`)}>
           <Target className="h-4 w-4 mr-2" /> Start Learning
         </Button>
       </div>
@@ -87,12 +138,38 @@ export const LearningPlanPage = () => {
               >
                 <Background />
                 <Controls />
+                <MiniMap />
+                <Panel position="top-right">
+                  <div className="bg-white/90 backdrop-blur p-2 rounded-lg border text-xs space-y-1">
+                    <p className="font-semibold">Phase Colors</p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" /> Foundation</p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-green-500 mr-1" /> Applied</p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1" /> Advanced</p>
+                    <p><span className="inline-block w-2 h-2 rounded-full bg-purple-500 mr-1" /> Simulation</p>
+                  </div>
+                </Panel>
               </ReactFlow>
             )}
           </Card>
+          {plan?.summary && (
+            <Card className="p-4 text-sm text-text-secondary">
+              <p>{plan.summary}</p>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">
+          <Card className="p-5 space-y-3 bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+            <h4 className="font-bold text-text-primary flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-primary" /> Plan Analytics
+            </h4>
+            <div className="text-sm text-text-secondary space-y-1">
+              <p>Total tasks: {plan?.tasks?.length ?? 0}</p>
+              <p>Total hours: {plan?.analytics?.total_hours ?? 'N/A'}</p>
+              <p>Focus skills: {(plan?.focus_skills ?? []).join(', ') || 'N/A'}</p>
+            </div>
+          </Card>
+
           <h3 className="font-bold text-text-primary px-2">Actionable Tasks</h3>
           <div className="space-y-3">
             {plan?.tasks.map((task, i) => (
@@ -115,6 +192,28 @@ export const LearningPlanPage = () => {
             ))}
           </div>
 
+          {(plan?.youtube_resources?.length ?? 0) > 0 && (
+            <Card className="p-6 border border-red-100 bg-red-50/40 space-y-3">
+              <h4 className="font-bold text-red-700 flex items-center gap-2 text-sm">
+                <Video className="h-4 w-4" /> YouTube Upskill Resources
+              </h4>
+              <div className="space-y-2">
+                {plan?.youtube_resources?.map((r, idx) => (
+                  <a
+                    key={idx}
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block p-3 rounded-lg border border-red-100 bg-white hover:border-red-300 transition-colors"
+                  >
+                    <p className="text-sm font-semibold text-text-primary">{r.title}</p>
+                    <p className="text-xs text-text-secondary">{r.skill} {r.duration ? `• ${r.duration}` : ''}</p>
+                  </a>
+                ))}
+              </div>
+            </Card>
+          )}
+
           <Card className="p-6 bg-primary/5 border-none space-y-4">
             <h4 className="font-bold text-primary flex items-center gap-2 text-sm">
               <CheckCircle2 className="h-4 w-4" /> Mastery Tips
@@ -123,6 +222,7 @@ export const LearningPlanPage = () => {
               <li>• Focus on hands-on implementation</li>
               <li>• Review weak areas from your assessment</li>
               <li>• Complete all scenario-based tasks</li>
+              <li className="flex items-center gap-1"><Clock3 className="h-3 w-3" /> Track hours weekly against milestones</li>
             </ul>
           </Card>
         </div>

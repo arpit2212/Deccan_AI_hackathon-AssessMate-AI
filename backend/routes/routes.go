@@ -18,9 +18,15 @@ func SetupRoutes(r *gin.Engine) {
 			protected.GET("/journeys", handlers.GetJourneys)
 			protected.GET("/journeys/:journeyId", handlers.GetJourney)
 			protected.POST("/analyze", handlers.Analyze)
+			protected.GET("/assignments", handlers.ListAssignments)
 			protected.GET("/assignment/:journeyId", handlers.GetOrCreateAssignment)
+			protected.POST("/assignment/:journeyId/reattempt", handlers.ReattemptAssignment)
 			protected.POST("/assignment/submit", handlers.SubmitAssignment)
+			protected.GET("/learning-plans", handlers.ListLearningPlans)
 			protected.GET("/learning-plan/:journeyId", handlers.GetOrCreateLearningPlan)
+			protected.PATCH("/learning-plan/:journeyId/progress", handlers.UpdateLearningProgress)
+			protected.POST("/learning-plan/:journeyId/progress", handlers.UpdateLearningProgress)
+			protected.POST("/learning-plan/:journeyId/chat", handlers.LearningPlanChat)
 		}
 	}
 }

@@ -21,6 +21,11 @@ interface Assignment {
   id: string
   questions: Question[]
   status: string
+  attempts?: Array<{
+    attempt_number: number
+    score: number
+    answers?: Record<string, string>
+  }>
 }
 
 export const AssignmentPage = () => {
@@ -49,6 +54,17 @@ export const AssignmentPage = () => {
         }
         const data = await response.json()
         setAssignment(data)
+        if (data?.status === 'completed' && Array.isArray(data?.attempts) && data.attempts.length > 0) {
+          const latest = data.attempts[data.attempts.length - 1]
+          const latestAnswers = latest?.answers ?? {}
+          const hydrated: Record<number, string> = {}
+          Object.entries(latestAnswers).forEach(([k, v]) => {
+            const idx = Number(k)
+            if (!Number.isNaN(idx)) hydrated[idx] = String(v ?? '')
+          })
+          setAnswers(hydrated)
+          setScore(Number(latest?.score ?? 0))
+        }
       } catch (error) {
         console.error(error)
         toast.error('Failed to load assignment')
@@ -129,7 +145,10 @@ export const AssignmentPage = () => {
         body: JSON.stringify({
           journey_id: journeyId,
           score: finalScore,
-          skills: skillsToUpdate
+          skills: skillsToUpdate,
+          answers: Object.fromEntries(
+            Object.entries(answers).map(([k, v]) => [String(k), v])
+          )
         })
       })
 
@@ -233,17 +252,21 @@ export const AssignmentPage = () => {
   }
 
   const currentQuestion = assignment.questions[currentQuestionIndex]
+  const isReviewMode = assignment.status === 'completed' && !showResults
+  const selectedAnswer = answers[currentQuestionIndex] || ''
+  const isMcq = (currentQuestion.type || '').toLowerCase() === 'mcq'
+  const isCorrect = selectedAnswer === currentQuestion.correct_answer
 
   return (
     <div className="max-w-4xl mx-auto py-8">
       <div className="flex justify-between items-end mb-8">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold text-text-primary">Skill Assessment</h1>
+          <h1 className="text-2xl font-bold text-text-primary">{isReviewMode ? 'Assignment Review' : 'Skill Assessment'}</h1>
           <p className="text-text-secondary">Question {currentQuestionIndex + 1} of {assignment.questions.length}</p>
         </div>
         <div className="flex items-center gap-2 text-primary font-medium bg-primary/5 px-4 py-2 rounded-full">
           <Timer className="h-4 w-4" />
-          <span>Dynamic Test</span>
+          <span>{isReviewMode ? 'Completed Attempt' : 'Dynamic Test'}</span>
         </div>
       </div>
 
@@ -279,20 +302,25 @@ export const AssignmentPage = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              {(currentQuestion.type || '').toLowerCase() === 'mcq' && currentQuestion.options ? (
+              {isMcq && currentQuestion.options ? (
                 currentQuestion.options.map((option, i) => (
                   <button
                     key={i}
-                    onClick={() => handleAnswerSelect(option)}
+                    onClick={() => !isReviewMode && handleAnswerSelect(option)}
+                    disabled={isReviewMode}
                     className={`text-left p-4 rounded-xl border-2 transition-all ${
-                      answers[currentQuestionIndex] === option
-                        ? 'border-primary bg-primary/5'
+                      selectedAnswer === option
+                        ? (isReviewMode
+                          ? (option === currentQuestion.correct_answer ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50')
+                          : 'border-primary bg-primary/5')
+                        : (isReviewMode && option === currentQuestion.correct_answer)
+                        ? 'border-green-400 bg-green-50'
                         : 'border-gray-100 hover:border-primary/30 hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-center gap-4">
                       <span className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${
-                        answers[currentQuestionIndex] === option
+                        selectedAnswer === option
                           ? 'bg-primary text-white'
                           : 'bg-gray-100 text-text-secondary'
                       }`}>
@@ -304,13 +332,30 @@ export const AssignmentPage = () => {
                 ))
               ) : (
                 <textarea
-                  value={answers[currentQuestionIndex] || ''}
-                  onChange={(e) => handleAnswerSelect(e.target.value)}
+                  value={selectedAnswer}
+                  onChange={(e) => !isReviewMode && handleAnswerSelect(e.target.value)}
                   placeholder="Type your answer or approach here..."
+                  readOnly={isReviewMode}
                   className="w-full h-40 p-4 rounded-xl border-2 border-gray-100 focus:border-primary outline-none resize-none font-medium"
                 />
               )}
             </div>
+
+            {isReviewMode && (
+              <div className="space-y-3 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <p className={`text-sm font-semibold ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                  {isCorrect ? 'Your answer is correct.' : 'Your answer is incorrect.'}
+                </p>
+                <p className="text-sm text-text-secondary">
+                  <span className="font-semibold text-text-primary">Correct answer: </span>
+                  {currentQuestion.correct_answer}
+                </p>
+                <p className="text-sm text-text-secondary">
+                  <span className="font-semibold text-text-primary">Explanation: </span>
+                  {currentQuestion.explanation}
+                </p>
+              </div>
+            )}
 
             <div className="flex justify-between pt-4">
               <Button
@@ -321,18 +366,22 @@ export const AssignmentPage = () => {
                 Previous
               </Button>
               
-              {currentQuestionIndex === assignment.questions.length - 1 ? (
+              {isReviewMode ? (
+                <Button onClick={() => navigate(`/upskill-assignment?journey=${journeyId}`)}>
+                  Re-attempt (Upskill)
+                </Button>
+              ) : currentQuestionIndex === assignment.questions.length - 1 ? (
                 <Button 
                   onClick={handleSubmit} 
                   isLoading={isSubmitting}
-                  disabled={!answers[currentQuestionIndex]}
+                  disabled={!selectedAnswer}
                 >
                   Submit Assessment
                 </Button>
               ) : (
                 <Button 
                   onClick={handleNext}
-                  disabled={!answers[currentQuestionIndex]}
+                  disabled={!selectedAnswer}
                 >
                   Next Question <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>

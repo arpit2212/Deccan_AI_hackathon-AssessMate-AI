@@ -99,9 +99,22 @@ type AssessmentAgentOutput struct {
 
 // LearningPlanOutput represents the nodes and edges for the learning roadmap
 type LearningPlanOutput struct {
-	Nodes []RFNode `json:"nodes"`
-	Edges []RFEdge `json:"edges"`
-	Tasks []string `json:"tasks"`
+	Title           string                 `json:"title,omitempty"`
+	Summary         string                 `json:"summary,omitempty"`
+	EstimatedWeeks  int                    `json:"estimated_weeks,omitempty"`
+	FocusSkills     []string               `json:"focus_skills,omitempty"`
+	Nodes           []RFNode               `json:"nodes"`
+	Edges           []RFEdge               `json:"edges"`
+	Tasks           []string               `json:"tasks"`
+	Analytics       map[string]interface{} `json:"analytics,omitempty"`
+	YouTubeResources []LearningResource    `json:"youtube_resources,omitempty"`
+}
+
+type LearningResource struct {
+	Title    string `json:"title"`
+	URL      string `json:"url"`
+	Skill    string `json:"skill"`
+	Duration string `json:"duration,omitempty"`
 }
 
 type RFNode struct {
@@ -112,7 +125,12 @@ type RFNode struct {
 		Y float64 `json:"y"`
 	} `json:"position"`
 	Data struct {
-		Label string `json:"label"`
+		Label       string `json:"label"`
+		Skill       string `json:"skill,omitempty"`
+		Phase       string `json:"phase,omitempty"`
+		Difficulty  string `json:"difficulty,omitempty"`
+		DurationHrs int    `json:"duration_hrs,omitempty"`
+		Outcome     string `json:"outcome,omitempty"`
 	} `json:"data"`
 }
 
