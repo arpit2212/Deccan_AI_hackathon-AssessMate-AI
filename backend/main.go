@@ -2,50 +2,33 @@ package main
 
 import (
 	"log"
-	"net/http"
 
 	"assessmate-backend/config"
 	"assessmate-backend/db"
 	"assessmate-backend/routes"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/rs/cors"
 )
 
 func main() {
-	// Load configuration
 	config.LoadConfig()
 
-	// Initialize Supabase
 	if err := db.InitDB(); err != nil {
 		log.Fatal("Failed to initialize Supabase client:", err)
 	}
 
-	// Initialize Gin
 	r := gin.Default()
 
-	// Setup CORS
-	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{config.AppConfig.FrontendURL},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{config.AppConfig.FrontendURL},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Authorization", "Content-Type"},
 		AllowCredentials: true,
-	})
+	}))
 
-	// Use CORS middleware
-	r.Use(func(ctx *gin.Context) {
-		c.HandlerFunc(ctx.Writer, ctx.Request)
-		if ctx.Request.Method == "OPTIONS" {
-			ctx.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-		ctx.Next()
-	})
-
-	// Setup routes
 	routes.SetupRoutes(r)
 
-	// Start server
 	log.Printf("Server starting on port %s", config.AppConfig.Port)
 	if err := r.Run(":" + config.AppConfig.Port); err != nil {
 		log.Fatal("Failed to start server:", err)
