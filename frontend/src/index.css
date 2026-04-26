@@ -1,3 +1,38 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "@fontsource/plus-jakarta-sans";
+@import "@fontsource/inter";
+
+@theme {
+  --color-background: #F6F8FB;
+  --color-section: #F1F5F9;
+  --color-card: #FFFFFF;
+  --color-text-primary: #0B1220;
+  --color-text-secondary: #5B6B82;
+  --color-primary: #0F766E;
+  --color-primary-hover: #0D5F5A;
+  --color-primary-light: #E6FFFA;
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+  --color-error: #DC2626;
+
+  --font-plus-jakarta-sans: "Plus Jakarta Sans", sans-serif;
+  --font-inter: "Inter", sans-serif;
+
+  --radius-xl: 12px;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-secondary font-inter antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-plus-jakarta-sans text-text-primary;
+  }
+}
+
+/* Page transitions */
+.page-transition {
+  @apply opacity-0 translate-y-4;
+}
