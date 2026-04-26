@@ -6,7 +6,7 @@ import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../hooks/useAuth'
 import toast from 'react-hot-toast'
-import type { AnalyzeResponse, SkillAnalysis } from '../types'
+import type { AnalyzeResponse, SkillMatch } from '../types'
 
 const API_URL = 'http://localhost:8080/api'
 
@@ -68,11 +68,6 @@ export const NewJourneyPage: React.FC = () => {
       setResult(data)
       setStep(3)
       toast.success('Analysis complete!')
-      
-      // Redirect to assignment after 3 seconds
-      setTimeout(() => {
-        navigate(`/assignment/${data.journey_id}`)
-      }, 3000)
     } catch (error) {
       console.error(error)
       toast.error('Failed to analyze. Please try again.')
@@ -149,18 +144,14 @@ export const NewJourneyPage: React.FC = () => {
                   <label className="text-sm font-medium text-text-primary flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-primary" /> Preparation Time
                   </label>
-                  <select
+                  <input
+                    type="text"
                     name="prepTime"
                     value={formData.prepTime}
                     onChange={handleInputChange}
-                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none bg-white"
-                  >
-                    <option value="7 days">1 Week</option>
-                    <option value="30 days">1 Month</option>
-                    <option value="90 days">3 Months</option>
-                    <option value="180 days">6 Months</option>
-                    <option value="365 days">1 Year</option>
-                  </select>
+                    placeholder="e.g. 15 days"
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                  />
                 </div>
               </div>
               <div className="flex justify-end">
@@ -235,10 +226,7 @@ export const NewJourneyPage: React.FC = () => {
               </p>
               <div className="mt-4 p-4 bg-white rounded-xl border border-primary/10">
                 <p className="text-primary font-medium">
-                  Next Step: Complete your 20-question dynamic assessment to finalize your learning plan.
-                </p>
-                <p className="text-sm text-text-secondary mt-2">
-                  Redirecting to the assignment tab in a few seconds...
+                  Review your analysis below, then click "Start Assessment" to begin your personalized evaluation.
                 </p>
               </div>
             </div>
@@ -261,20 +249,20 @@ export const NewJourneyPage: React.FC = () => {
                       strokeWidth="10"
                       fill="transparent"
                       strokeDasharray={364.4}
-                      strokeDashoffset={364.4 * (1 - result.analysis.fit_score)}
+                      strokeDashoffset={364.4 * (1 - result.analysis.fit_score / 100)}
                       className="text-primary transition-all duration-1000 ease-out"
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-bold text-primary">{Math.round(result.analysis.fit_score * 100)}%</span>
+                    <span className="text-3xl font-bold text-primary">{Math.round(result.analysis.fit_score)}%</span>
                     <span className="text-[10px] uppercase tracking-wider text-text-secondary font-bold">Fit Score</span>
                   </div>
                 </div>
                 <div className="flex-1 text-center md:text-left">
-                  <h2 className="text-2xl font-bold mb-2">Analysis Complete</h2>
+                  <h2 className="text-2xl font-bold mb-2">Analysis Overview</h2>
                   <p className="text-text-secondary mb-4">{result.company.company_context}</p>
                   <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                    {result.analysis.critical_gaps.map(gap => (
+                    {(result.analysis.critical_gaps ?? []).map(gap => (
                       <span key={gap} className="px-3 py-1 bg-red-50 text-red-600 text-xs font-bold rounded-full flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" /> Critical Gap: {gap}
                       </span>
@@ -291,21 +279,24 @@ export const NewJourneyPage: React.FC = () => {
                   <CheckCircle2 className="h-5 w-5 text-green-500" /> Skill Analysis
                 </h3>
                 <div className="space-y-4">
-                  {result.analysis.skill_analysis.map((skill: SkillAnalysis) => (
-                    <div key={skill.skill} className="space-y-1">
+                  {(result.analysis.skill_analysis ?? []).map((skill: SkillMatch, idx) => (
+                    <div key={`${skill.name || 'skill'}-${idx}`} className="space-y-1">
                       <div className="flex justify-between text-sm">
-                        <span className="font-medium">{skill.skill}</span>
-                        <span className="text-text-secondary">{skill.current_level}/{skill.required_level}</span>
+                        <span className="font-medium">{skill.name || 'Unknown skill'}</span>
+                        <span className="text-text-secondary">{skill.estimated_level}/{skill.required_level}</span>
                       </div>
                       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div 
                           className={`h-full transition-all duration-1000 ${
-                            skill.status === 'strong' ? 'bg-green-500' : 
-                            skill.status === 'partial' ? 'bg-yellow-500' : 'bg-red-500'
+                            skill.gap === 0 ? 'bg-green-500' : 
+                            skill.gap <= 2 ? 'bg-yellow-500' : 'bg-red-500'
                           }`}
-                          style={{ width: `${(skill.current_level / skill.required_level) * 100}%` }}
+                          style={{ width: `${Math.min(100, (skill.estimated_level / Math.max(1, skill.required_level)) * 100)}%` }}
                         />
                       </div>
+                      {skill.evidence && (
+                        <p className="text-[10px] text-text-secondary italic">Evidence: {skill.evidence}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -316,7 +307,7 @@ export const NewJourneyPage: React.FC = () => {
                   <Rocket className="h-5 w-5 text-primary" /> Interview Process
                 </h3>
                 <div className="space-y-3">
-                  {result.company.interview_process.map((step, i) => (
+                  {(result.company?.interview_process ?? []).map((step, i) => (
                     <div key={i} className="flex gap-3 items-start">
                       <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
                         {i + 1}
@@ -328,16 +319,20 @@ export const NewJourneyPage: React.FC = () => {
               </Card>
             </div>
 
-            {/* Redirection Message */}
+            {/* Manual Assignment Trigger */}
             <Card className="p-8 border-2 border-primary/20 bg-primary/5 text-center">
-              <Compass className="h-12 w-12 text-primary mx-auto mb-4 animate-pulse" />
-              <h3 className="text-xl font-bold mb-2">Preparing Your Assessment</h3>
+              <Compass className="h-12 w-12 text-primary mx-auto mb-4" />
+              <h3 className="text-xl font-bold mb-2">Ready for your Assessment?</h3>
               <p className="text-text-secondary mb-6">
-                We're generating 20 dynamic questions based on your skill gaps and target company.
+                We've prepared 20 dynamic questions based on your skill gaps and target company.
               </p>
-              <div className="flex justify-center items-center gap-2 text-primary font-medium">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Redirecting to Assignment tab...
+              <div className="flex justify-center">
+                <Button 
+                  onClick={() => navigate(`/assignment/${result.journey_id}`)} 
+                  className="gap-2 px-8 py-6 text-lg"
+                >
+                  Start Assessment Now <Rocket className="h-5 w-5" />
+                </Button>
               </div>
             </Card>
 

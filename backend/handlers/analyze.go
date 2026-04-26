@@ -3,31 +3,19 @@ package handlers
 import (
 	"net/http"
 
+	"assessmate-backend/agents"
 	"assessmate-backend/db"
+	"assessmate-backend/models"
 	"assessmate-backend/services"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-type Journey struct {
-	ID             string      `json:"id,omitempty"`
-	UserID         string      `json:"user_id"`
-	RoleName       string      `json:"role_name"`
-	CompanyName    string      `json:"company_name"`
-	JDText         string      `json:"jd_text"`
-	ResumeText     string      `json:"resume_text"`
-	AnalysisResult interface{} `json:"analysis_result"`
-	CompanyContext interface{} `json:"company_context"`
-	Status         string      `json:"status"`
-	CreatedAt      time.Time   `json:"created_at"`
-}
-
 type AnalyzeRequest struct {
-	JDText      string `json:"jd_text" binding:"required"`
-	ResumeText  string `json:"resume_text" binding:"required"`
-	CompanyName string `json:"company_name" binding:"required"`
-	RoleName    string `json:"role_name" binding:"required"`
+	JDText      string `json:"jd_text"`
+	ResumeText  string `json:"resume_text"`
+	CompanyName string `json:"company_name"`
+	RoleName    string `json:"role_name"`
 }
 
 func Analyze(c *gin.Context) {
@@ -51,7 +39,7 @@ func Analyze(c *gin.Context) {
 	}
 
 	// 1. Run Comprehensive Analysis (Combined Agent to save quota)
-	compOutput, err := services.AnalyzeComprehensive(ctx, req.JDText, req.ResumeText, req.CompanyName, req.RoleName)
+	compOutput, err := agents.AnalyzeComprehensive(ctx, req.JDText, req.ResumeText, req.CompanyName, req.RoleName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Analysis failed: " + err.Error()})
 		return
@@ -61,7 +49,7 @@ func Analyze(c *gin.Context) {
 	intelligenceResult := services.PerformIntelligenceAnalysis(&compOutput.JD, &compOutput.Resume)
 
 	// 3. Store in DB
-	journey := Journey{
+	journey := models.Journey{
 		UserID:         userId,
 		RoleName:       req.RoleName,
 		CompanyName:    req.CompanyName,
@@ -72,7 +60,7 @@ func Analyze(c *gin.Context) {
 		Status:         "analyzed",
 	}
 
-	var savedJourney Journey
+	var savedJourney models.Journey
 	_, err = db.Client.From("journeys").Insert(journey, false, "", "", "").Single().ExecuteTo(&savedJourney)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save journey: " + err.Error()})
@@ -80,24 +68,25 @@ func Analyze(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "Analysis complete! Complete your assignment through the assignment tab.",
+		"message":    "Analysis complete! Complete your assessment through the assignment tab.",
 		"journey_id": savedJourney.ID,
 		"analysis":   intelligenceResult,
 		"company":    compOutput.Company,
 	})
 }
 
-func GetUserJourneys(c *gin.Context) {
-	userId, exists := c.Get("userId")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
+func GetJourneys(c *gin.Context) {
+	userId, _ := c.Get("userId")
 
-	var journeys []Journey
-	_, err := db.Client.From("journeys").Select("*", "exact", false).Eq("user_id", userId.(string)).ExecuteTo(&journeys)
+	var journeys []models.Journey
+	_, err := db.Client.From("journeys").
+		Select("*", "exact", false).
+		Eq("user_id", userId.(string)).
+		Order("created_at", nil).
+		ExecuteTo(&journeys)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch journeys: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch journeys"})
 		return
 	}
 
@@ -105,11 +94,17 @@ func GetUserJourneys(c *gin.Context) {
 }
 
 func GetJourney(c *gin.Context) {
-	journeyId := c.Param("journeyId")
+	id := c.Param("id")
 	userId, _ := c.Get("userId")
 
-	var journey Journey
-	_, err := db.Client.From("journeys").Select("*", "exact", false).Eq("id", journeyId).Eq("user_id", userId.(string)).Single().ExecuteTo(&journey)
+	var journey models.Journey
+	_, err := db.Client.From("journeys").
+		Select("*", "exact", false).
+		Eq("id", id).
+		Eq("user_id", userId.(string)).
+		Single().
+		ExecuteTo(&journey)
+
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journey not found"})
 		return

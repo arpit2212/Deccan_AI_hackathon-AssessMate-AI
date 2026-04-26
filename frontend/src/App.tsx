@@ -10,6 +10,7 @@ import { JourneysPage } from './pages/JourneysPage'
 import { NewJourneyPage } from './pages/NewJourneyPage'
 import { AssignmentPage } from './pages/AssignmentPage'
 import { LearningPlanPage } from './pages/LearningPlanPage'
+import { AgentsPage } from './pages/AgentsPage'
 import { useEffect } from 'react'
 import { Spinner } from './components/ui/Spinner'
 
@@ -74,6 +75,7 @@ function App() {
             <Route path="/assignment/:journeyId" element={<AssignmentPage />} />
             <Route path="/learning-plan" element={<RedirectToLatest type="learning-plan" />} />
             <Route path="/learning-plan/:journeyId" element={<LearningPlanPage />} />
+            <Route path="/agents" element={<AgentsPage />} />
             {/* Redirect /app or other unknown routes to dashboard */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>

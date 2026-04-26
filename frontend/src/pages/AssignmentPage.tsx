@@ -43,7 +43,10 @@ export const AssignmentPage = () => {
             'Authorization': `Bearer ${session?.access_token}`
           }
         })
-        if (!response.ok) throw new Error('Failed to fetch assignment')
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({} as any))
+          throw new Error(errData.error || 'Failed to fetch assignment')
+        }
         const data = await response.json()
         setAssignment(data)
       } catch (error) {
@@ -78,16 +81,25 @@ export const AssignmentPage = () => {
   const calculateScore = () => {
     if (!assignment) return 0
     let correctCount = 0
+    let scorable = 0
     assignment.questions.forEach((q, index) => {
+      const isMcq = (q.type || '').toLowerCase() === 'mcq'
+      if (!isMcq) return
+      scorable++
       if (answers[index] === q.correct_answer) {
         correctCount++
       }
     })
-    return Math.round((correctCount / assignment.questions.length) * 100)
+    if (scorable === 0) return 0
+    return Math.round((correctCount / scorable) * 100)
   }
 
   const handleSubmit = async () => {
     if (!assignment) return
+    if (!journeyId) {
+      toast.error('Journey ID missing. Please go back and open the assignment again.')
+      return
+    }
     setIsSubmitting(true)
     const finalScore = calculateScore()
     setScore(finalScore)
@@ -121,7 +133,10 @@ export const AssignmentPage = () => {
         })
       })
 
-      if (!response.ok) throw new Error('Failed to submit assignment')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({} as any))
+        throw new Error(errData.error || 'Failed to submit assignment')
+      }
       
       setShowResults(true)
       toast.success('Assignment submitted!')
@@ -264,7 +279,7 @@ export const AssignmentPage = () => {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              {currentQuestion.type === 'MCQ' && currentQuestion.options ? (
+              {(currentQuestion.type || '').toLowerCase() === 'mcq' && currentQuestion.options ? (
                 currentQuestion.options.map((option, i) => (
                   <button
                     key={i}

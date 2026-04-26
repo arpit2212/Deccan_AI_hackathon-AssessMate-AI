@@ -1,6 +1,6 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Compass, PlusCircle, FileText, BookOpen, Settings, HelpCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Compass, PlusCircle, FileText, BookOpen, Settings, ChevronLeft, ChevronRight, Cpu } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 export const Sidebar: React.FC = () => {
@@ -12,6 +12,7 @@ export const Sidebar: React.FC = () => {
     { icon: PlusCircle, label: 'New Journey', path: '/journeys/new' },
     { icon: FileText, label: 'Assignment', path: '/assignment' },
     { icon: BookOpen, label: 'Learning Plan', path: '/learning-plan' },
+    { icon: Cpu, label: 'Intelligence Agents', path: '/agents' },
     { icon: Settings, label: 'Settings', path: '/settings' },
   ]
 

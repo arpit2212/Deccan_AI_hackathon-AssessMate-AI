@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Plus, Compass, ChevronRight, Calendar, Briefcase, Building2 } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { useAuth } from '../context/AuthContext'
@@ -12,6 +12,10 @@ interface Journey {
   company_name: string
   status: string
   created_at: string
+  analysis_result: {
+    fit_score: number
+    critical_gaps: string[]
+  }
 }
 
 export const JourneysPage: React.FC = () => {
@@ -89,6 +93,21 @@ export const JourneysPage: React.FC = () => {
                   <Building2 className="h-4 w-4" />
                   <span className="text-sm font-medium">{journey.company_name}</span>
                 </div>
+
+                {journey.analysis_result && (
+                  <div className="mb-4 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-text-secondary">
+                      <span>Initial Fit Score</span>
+                      <span className="text-primary">{Math.round(journey.analysis_result.fit_score)}%</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all duration-1000"
+                        style={{ width: `${journey.analysis_result.fit_score}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2 text-text-secondary mb-6">
                   <Calendar className="h-4 w-4" />

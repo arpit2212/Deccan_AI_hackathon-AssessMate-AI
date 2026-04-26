@@ -1,8 +1,9 @@
 package handlers
 
 import (
+	"assessmate-backend/agents"
 	"assessmate-backend/db"
-	"assessmate-backend/services"
+	"assessmate-backend/models"
 	"context"
 	"net/http"
 	"time"
@@ -31,7 +32,7 @@ func GetOrCreateLearningPlan(c *gin.Context) {
 	}
 
 	// 2. Fetch journey data (including assignment score/results if needed)
-	var journey Journey
+	var journey models.Journey
 	_, err = db.Client.From("journeys").Select("*", "exact", false).Eq("id", journeyId).Single().ExecuteTo(&journey)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Journey not found"})
@@ -40,7 +41,7 @@ func GetOrCreateLearningPlan(c *gin.Context) {
 
 	// 3. Generate Learning Plan via Gemini
 	ctx := context.Background()
-	planOutput, err := services.GenerateLearningPlan(ctx, journey.AnalysisResult, timeConstraint)
+	planOutput, err := agents.GenerateLearningPlan(ctx, journey.AnalysisResult, timeConstraint)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate learning plan: " + err.Error()})
 		return

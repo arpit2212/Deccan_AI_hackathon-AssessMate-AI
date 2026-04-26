@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '../hooks/useAuth'
 import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
-import { Compass, Dna, Rocket, Plus, ChevronRight, Clock, Star } from 'lucide-react'
+import { Compass, Rocket, Plus, ChevronRight, Clock, Star } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Spinner } from '../components/ui/Spinner'
 

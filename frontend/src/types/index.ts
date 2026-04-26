@@ -11,28 +11,30 @@ export interface AuthState {
   loading: boolean
 }
 
-export interface SkillAnalysis {
-  skill: string
+export interface SkillMatch {
+  name: string
   required_level: number
-  current_level: number
+  estimated_level: number
   gap: number
-  status: 'missing' | 'partial' | 'strong'
-  weak_areas: string[]
+  importance: string
+  evidence: string
+  depth: Record<string, string>
 }
 
-export interface AnalysisResult {
-  fit_score: number
-  skill_analysis: SkillAnalysis[]
+export interface FinalAnalysis {
+  skill_analysis: SkillMatch[]
   critical_gaps: string[]
-  overestimated_skills: string[]
-  test_strategy: string[]
-  learning_strategy: string[]
+  fit_score: number
+  comprehensive?: any
 }
 
 export interface CompanyContext {
+  difficulty: string
+  interview_focus: string[]
+  role_expectations: string[]
+  role_analysis: string
   company_context: string
   interview_process: string[]
-  role_expectations: string[]
   recommended_focus: string[]
 }
 
@@ -52,7 +54,7 @@ export interface AssessmentOutput {
 
 export interface AnalyzeResponse {
   journey_id: string
-  analysis: AnalysisResult
+  analysis: FinalAnalysis
   company: CompanyContext
   message: string
 }
