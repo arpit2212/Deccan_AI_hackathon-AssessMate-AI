@@ -1,24 +1,9 @@
-# AssessMate AI
+#🚀 AssessMate AI
+### Adaptive Skill Intelligence & Learning Copilot
 
-AssessMate AI is an intelligent interview-preparation platform that transforms a candidate's resume + target job context into a measurable skill graph, adaptive assessments, and milestone-driven learning plans.
-
-It is designed for one goal: **turning "I want this role" into a practical, trackable execution roadmap**.
-
-## Project Name
-
-**AssessMate AI - Adaptive Skill Intelligence & Learning Copilot**
-
-## Features
-
-- **Journey-Centric Workflow**: create role/company-specific journeys using JD, resume, role name, and company context.
-- **Multi-Agent Intelligence Pipeline**: orchestrated AI agents extract, normalize, and fuse signals into skill-level intelligence.
-- **Deep Skill Gap Engine**: identifies missing/partial/strong skills, weighted gaps, and critical bottlenecks.
-- **Adaptive Assignment Generation**: creates mixed-format assessments (MCQ, debugging, scenario, performance, design) with progressive difficulty.
-- **Upskill Reattempt Mode**: targeted reassessment on selected weak skills with preserved attempt history.
-- **Live Learning Plan Roadmap**: visual graph + tasks + milestones + analytics mapped to detected skill gaps.
-- **Start Learning Workspace**: task tracking, progress persistence, and AI mentor chat in one place.
-- **AI YouTube Recommender**: generates skill-mapped course/video suggestions based on journey + plan context.
-- **Production-Ready UX**: responsive, animated UI with robust error handling and fallback logic for real-world data variance.
+> **Resume is a claim. Assessment is proof.**
+ 
+A Skill Intelligence Engine that goes beyond resume matching — it measures how deeply candidates actually understand their skills, identifies hidden gaps, and generates personalized learning paths to close them.
 
 ## Tech Stack
 
@@ -44,12 +29,66 @@ It is designed for one goal: **turning "I want this role" into a practical, trac
 - **Auth Provider**: Supabase Auth (OAuth/session)
 - **Storage Strategy**: structured + semi-structured JSON (`analysis_result`, assignment payloads, learning plan payloads)
 
+## Features
+
+- **Journey-Centric Workflow**: create role/company-specific journeys using JD, resume, role name, and company context.
+- **Multi-Agent Intelligence Pipeline**: orchestrated AI agents extract, normalize, and fuse signals into skill-level intelligence.
+- **Deep Skill Gap Engine**: identifies missing/partial/strong skills, weighted gaps, and critical bottlenecks.
+- **Adaptive Assignment Generation**: creates mixed-format assessments (MCQ, debugging, scenario, performance, design) with progressive difficulty.
+- **Upskill Reattempt Mode**: targeted reassessment on selected weak skills with preserved attempt history.
+- **Live Learning Plan Roadmap**: visual graph + tasks + milestones + analytics mapped to detected skill gaps.
+- **Start Learning Workspace**: task tracking, progress persistence, and AI mentor chat in one place.
+- **AI YouTube Recommender**: generates skill-mapped course/video suggestions based on journey + plan context.
+- **Production-Ready UX**: responsive, animated UI with robust error handling and fallback logic for real-world data variance.
+
 ## Architecture Diagram
 
 - Diagram file in repo: `ARCHDIGRAM.drawio.png`
 - Direct link: [Architecture Diagram](https://github.com/arpit2212/Deccan_AI_hackathon-AssessMate-AI/blob/main/ARCHDIGRAM.drawio.png)
 
 ![AssessMate AI Architecture](https://github.com/arpit2212/Deccan_AI_hackathon-AssessMate-AI/blob/main/ARCHDIGRAM.drawio.png)
+
+## 🧠 Core Idea
+
+AssessMate is built on a **Three-Layer Architecture**:
+
+### 🔹 1. Extraction Layer (AI)
+- JD Agent → extracts required skills & depth  
+- Resume Agent → estimates actual skill levels  
+
+---
+
+### 🔹 2. Intelligence Layer (Backend Logic)
+- Skill matching  
+- Gap calculation  
+- Fit score computation  
+- Weak area detection  
+
+👉 This is the **core brain of the system**
+
+---
+
+### 🔹 3. Validation Layer (Assessment Engine)
+- Adaptive question generation  
+- Real-world testing (debugging, performance, scenarios)  
+- Skill validation through evaluation  
+
+---
+
+## 🔄 How It Works
+
+
+Resume + JD
+↓
+AI Extraction
+↓
+Skill Intelligence (Gap Analysis)
+↓
+Adaptive Assessment
+↓
+Skill Validation
+↓
+Learning Plan
 
 ## AI Agent List and What They Do
 
@@ -129,60 +168,62 @@ AssessMate AI uses a specialized agent mesh where each agent contributes domain 
 5. Learning plan is generated from updated gaps and rendered as roadmap.
 6. Start Learning tracks task completion + mentor chat + YouTube recommendations.
 
-## API Surface (Core)
-
-- `POST /api/analyze` - create journey and initial intelligence
-- `GET /api/journeys` / `GET /api/journeys/:journeyId`
-- `GET /api/assignments`
-- `GET /api/assignment/:journeyId`
-- `POST /api/assignment/:journeyId/reattempt`
-- `POST /api/assignment/submit`
-- `GET /api/learning-plans`
-- `GET /api/learning-plan/:journeyId`
-- `POST /api/learning-plan/:journeyId/progress`
-- `POST /api/learning-plan/:journeyId/chat`
-- `GET /api/learning-plan/:journeyId/youtube-suggestions`
-
+## API Reference
+ 
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/analyze` | Submit resume + JD for analysis |
+| `GET` | `/api/journeys` | List all assessment journeys |
+| `GET` | `/api/assignment/:journeyId` | Fetch adaptive assessment |
+| `POST` | `/api/assignment/submit` | Submit assessment answers |
+| `POST` | `/api/assignment/:journeyId/reattempt` | Reattempt weak-skill sections |
+| `GET` | `/api/learning-plan/:journeyId` | Fetch personalized learning plan |
+| `POST` | `/api/learning-plan/:journeyId/progress` | Update task completion |
+| `POST` | `/api/learning-plan/:journeyId/chat` | Chat with AI mentor |
+| `GET` | `/api/learning-plan/:journeyId/youtube-suggestions` | Get resource recommendations |
+ 
+---
+ 
 ## Local Setup
-
+ 
 ### Prerequisites
-
+ 
 - Node.js 18+
 - Go 1.20+
-- Supabase project (Auth + Postgres)
+- Supabase project
 - Gemini API key
-
-### Environment
-
-Backend (`backend/.env`) expected keys:
-
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_JWT_SECRET`
-- `GEMINI_API_KEY`
-
-Frontend (`frontend/.env`) expected keys:
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-
-### Run
-
-Backend:
-
+### Environment Variables
+ 
+**Backend** — `backend/.env`
+ 
+```env
+SUPABASE_URL=
+SUPABASE_ANON_KEY=
+SUPABASE_JWT_SECRET=
+GEMINI_API_KEY=
+```
+ 
+**Frontend** — `frontend/.env`
+ 
+```env
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
+ 
+### Running Locally
+ 
 ```bash
+# Backend
 cd backend
 go run main.go
-```
-
-Frontend:
-
-```bash
+ 
+# Frontend
 cd frontend
 npm install
 npm run dev
 ```
-
+ 
+---
 ## Why This Project Stands Out
 
 - Combines **skill extraction, reasoning, adaptive evaluation, and learning execution** in one continuous loop.
