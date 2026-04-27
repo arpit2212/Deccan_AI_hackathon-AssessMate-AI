@@ -1,4 +1,4 @@
-#🚀 AssessMate AI
+# 🚀 AssessMate AI
 ### Adaptive Skill Intelligence & Learning Copilot
 
 > **Resume is a claim. Assessment is proof.**
